@@ -1,0 +1,702 @@
+{
+  "_comment": "The whole game. Add a line, get a new card. 'also' holds what a toddler plausibly says instead — dropped final consonants, a missing first syllable, or the STT returning the word without Turkish letters. A two-year-old saying 'apa' for 'elma' is a win, not a miss. 'group' is for filtering later; nothing reads it yet.",
+  "phrases": {
+    "_comment": "Canned lines for when the model is slow, down, or disabled. ask/again must not contain any deck word — the deck test enforces it.",
+    "ask": [
+      "Bak, bu ne?",
+      "Bu ne acaba?",
+      "Söyle bakalım, bu ne?",
+      "Peki bu ne?",
+      "Buna ne denir?"
+    ],
+    "yes": [
+      "Aferin sana!",
+      "Evet, bildin!",
+      "Çok güzel söyledin!",
+      "Harikasın!",
+      "Bravo, doğru!"
+    ],
+    "again": [
+      "Bir daha dene bakalım.",
+      "Hadi bir kere daha söyle.",
+      "Az kaldı, tekrar dene.",
+      "Hmm, bir daha söyler misin?",
+      "Haydi, bir daha!"
+    ]
+  },
+  "words": [
+    {
+      "word": "kedi",
+      "emoji": "🐱",
+      "group": "hayvan",
+      "also": [
+        "kedı",
+        "ked",
+        "kei",
+        "kiti"
+      ],
+      "cry": "miyav miyav"
+    },
+    {
+      "word": "köpek",
+      "emoji": "🐶",
+      "group": "hayvan",
+      "also": [
+        "köpe",
+        "kopek",
+        "pek",
+        "köpük"
+      ],
+      "cry": "hav hav hav"
+    },
+    {
+      "word": "at",
+      "emoji": "🐴",
+      "group": "hayvan",
+      "also": [
+        "aat",
+        "ata"
+      ],
+      "cry": "ihaha"
+    },
+    {
+      "word": "inek",
+      "emoji": "🐄",
+      "group": "hayvan",
+      "also": [
+        "ine",
+        "nek",
+        "inekk"
+      ],
+      "cry": "mööö"
+    },
+    {
+      "word": "koyun",
+      "emoji": "🐑",
+      "group": "hayvan",
+      "also": [
+        "koyu",
+        "yun",
+        "koyum"
+      ],
+      "cry": "meee"
+    },
+    {
+      "word": "keçi",
+      "emoji": "🐐",
+      "group": "hayvan",
+      "also": [
+        "keci",
+        "keç",
+        "kec"
+      ],
+      "cry": "me-e-e"
+    },
+    {
+      "word": "tavuk",
+      "emoji": "🐔",
+      "group": "hayvan",
+      "also": [
+        "tavu",
+        "tauk",
+        "vuk"
+      ],
+      "cry": "gıt gıt gıdak"
+    },
+    {
+      "word": "civciv",
+      "emoji": "🐤",
+      "group": "hayvan",
+      "also": [
+        "civ",
+        "cici",
+        "civci"
+      ],
+      "cry": "cik cik cik"
+    },
+    {
+      "word": "horoz",
+      "emoji": "🐓",
+      "group": "hayvan",
+      "also": [
+        "horo",
+        "roz",
+        "oroz"
+      ],
+      "cry": "ü-ürü-üüü"
+    },
+    {
+      "word": "kuş",
+      "emoji": "🐦",
+      "group": "hayvan",
+      "also": [
+        "kus",
+        "ku"
+      ],
+      "cry": "cik cik"
+    },
+    {
+      "word": "ördek",
+      "emoji": "🦆",
+      "group": "hayvan",
+      "also": [
+        "ordek",
+        "örde",
+        "dek"
+      ],
+      "cry": "vak vak"
+    },
+    {
+      "word": "baykuş",
+      "emoji": "🦉",
+      "group": "hayvan",
+      "also": [
+        "baykus",
+        "bayku"
+      ],
+      "cry": "uu uu"
+    },
+    {
+      "word": "papağan",
+      "emoji": "🦜",
+      "group": "hayvan",
+      "also": [
+        "papagan",
+        "papa",
+        "pağan"
+      ]
+    },
+    {
+      "word": "penguen",
+      "emoji": "🐧",
+      "group": "hayvan",
+      "also": [
+        "pengu",
+        "penguin",
+        "guen"
+      ]
+    },
+    {
+      "word": "domuz",
+      "emoji": "🐷",
+      "group": "hayvan",
+      "also": [
+        "domu",
+        "domus"
+      ],
+      "cry": "hor hor"
+    },
+    {
+      "word": "fare",
+      "emoji": "🐭",
+      "group": "hayvan",
+      "also": [
+        "fae",
+        "far",
+        "fareh"
+      ],
+      "cry": "cit cit"
+    },
+    {
+      "word": "tavşan",
+      "emoji": "🐰",
+      "group": "hayvan",
+      "also": [
+        "tavsan",
+        "tavşa",
+        "şan"
+      ]
+    },
+    {
+      "word": "ayı",
+      "emoji": "🐻",
+      "group": "hayvan",
+      "also": [
+        "ayi",
+        "aayı"
+      ],
+      "cry": "hırrr"
+    },
+    {
+      "word": "panda",
+      "emoji": "🐼",
+      "group": "hayvan",
+      "also": [
+        "pana",
+        "panta",
+        "pan"
+      ]
+    },
+    {
+      "word": "koala",
+      "emoji": "🐨",
+      "group": "hayvan",
+      "also": [
+        "koaa",
+        "kola",
+        "koal"
+      ]
+    },
+    {
+      "word": "aslan",
+      "emoji": "🦁",
+      "group": "hayvan",
+      "also": [
+        "asla",
+        "alan",
+        "aslaan"
+      ],
+      "cry": "hörrr"
+    },
+    {
+      "word": "kaplan",
+      "emoji": "🐯",
+      "group": "hayvan",
+      "also": [
+        "kapla",
+        "kaplaan",
+        "plan"
+      ],
+      "cry": "hörrr"
+    },
+    {
+      "word": "maymun",
+      "emoji": "🐵",
+      "group": "hayvan",
+      "also": [
+        "maymu",
+        "mamun",
+        "mun"
+      ],
+      "cry": "u u a a"
+    },
+    {
+      "word": "fil",
+      "emoji": "🐘",
+      "group": "hayvan",
+      "also": [
+        "fiil",
+        "fi"
+      ],
+      "cry": "törööö"
+    },
+    {
+      "word": "zürafa",
+      "emoji": "🦒",
+      "group": "hayvan",
+      "also": [
+        "zurafa",
+        "zafa",
+        "rafa"
+      ]
+    },
+    {
+      "word": "zebra",
+      "emoji": "🦓",
+      "group": "hayvan",
+      "also": [
+        "zeba",
+        "zebara",
+        "bra"
+      ]
+    },
+    {
+      "word": "deve",
+      "emoji": "🐫",
+      "group": "hayvan",
+      "also": [
+        "dev",
+        "deeve",
+        "debe"
+      ]
+    },
+    {
+      "word": "kurt",
+      "emoji": "🐺",
+      "group": "hayvan",
+      "also": [
+        "kur",
+        "kurtt"
+      ],
+      "cry": "uuuuu"
+    },
+    {
+      "word": "tilki",
+      "emoji": "🦊",
+      "group": "hayvan",
+      "also": [
+        "tiki",
+        "tilk",
+        "tilkı"
+      ]
+    },
+    {
+      "word": "kirpi",
+      "emoji": "🦔",
+      "group": "hayvan",
+      "also": [
+        "kipi",
+        "kirp",
+        "kipri"
+      ]
+    },
+    {
+      "word": "sincap",
+      "emoji": "🐿️",
+      "group": "hayvan",
+      "also": [
+        "sinca",
+        "sincab",
+        "cap"
+      ]
+    },
+    {
+      "word": "kanguru",
+      "emoji": "🦘",
+      "group": "hayvan",
+      "also": [
+        "kangu",
+        "kanguu",
+        "guru"
+      ]
+    },
+    {
+      "word": "kurbağa",
+      "emoji": "🐸",
+      "group": "hayvan",
+      "also": [
+        "kurbaga",
+        "bağa",
+        "kurba"
+      ],
+      "cry": "vrak vrak"
+    },
+    {
+      "word": "kaplumbağa",
+      "emoji": "🐢",
+      "group": "hayvan",
+      "also": [
+        "kaplumbaga",
+        "bağa",
+        "kaplum"
+      ]
+    },
+    {
+      "word": "yılan",
+      "emoji": "🐍",
+      "group": "hayvan",
+      "also": [
+        "yilan",
+        "yıla",
+        "lan"
+      ],
+      "cry": "tısss"
+    },
+    {
+      "word": "timsah",
+      "emoji": "🐊",
+      "group": "hayvan",
+      "also": [
+        "timsa",
+        "timza",
+        "sah"
+      ]
+    },
+    {
+      "word": "balık",
+      "emoji": "🐟",
+      "group": "hayvan",
+      "also": [
+        "balik",
+        "balı",
+        "bak"
+      ]
+    },
+    {
+      "word": "köpekbalığı",
+      "emoji": "🦈",
+      "group": "hayvan",
+      "also": [
+        "kopekbaligi",
+        "köpek balığı"
+      ]
+    },
+    {
+      "word": "balina",
+      "emoji": "🐋",
+      "group": "hayvan",
+      "also": [
+        "balia",
+        "balin",
+        "bali"
+      ]
+    },
+    {
+      "word": "yunus",
+      "emoji": "🐬",
+      "group": "hayvan",
+      "also": [
+        "yunu",
+        "unus",
+        "yunuz"
+      ]
+    },
+    {
+      "word": "ahtapot",
+      "emoji": "🐙",
+      "group": "hayvan",
+      "also": [
+        "ahtapo",
+        "aktapot",
+        "pot"
+      ]
+    },
+    {
+      "word": "yengeç",
+      "emoji": "🦀",
+      "group": "hayvan",
+      "also": [
+        "yengec",
+        "yenge",
+        "geç"
+      ]
+    },
+    {
+      "word": "fok",
+      "emoji": "🦭",
+      "group": "hayvan",
+      "also": [
+        "fo",
+        "fokk"
+      ]
+    },
+    {
+      "word": "kelebek",
+      "emoji": "🦋",
+      "group": "hayvan",
+      "also": [
+        "kelebe",
+        "kebek",
+        "bebek"
+      ]
+    },
+    {
+      "word": "arı",
+      "emoji": "🐝",
+      "group": "hayvan",
+      "also": [
+        "ari",
+        "aarı"
+      ],
+      "cry": "vızzz"
+    },
+    {
+      "word": "karınca",
+      "emoji": "🐜",
+      "group": "hayvan",
+      "also": [
+        "karinca",
+        "karın",
+        "kanca"
+      ]
+    },
+    {
+      "word": "uğurböceği",
+      "emoji": "🐞",
+      "group": "hayvan",
+      "also": [
+        "ugurbocegi",
+        "uğur böceği",
+        "böcek"
+      ]
+    },
+    {
+      "word": "salyangoz",
+      "emoji": "🐌",
+      "group": "hayvan",
+      "also": [
+        "salyango",
+        "sayangoz",
+        "goz"
+      ]
+    },
+    {
+      "word": "elma",
+      "emoji": "🍎",
+      "group": "yiyecek",
+      "also": [
+        "alma",
+        "ema",
+        "apa"
+      ]
+    },
+    {
+      "word": "muz",
+      "emoji": "🍌",
+      "group": "yiyecek",
+      "also": [
+        "mus",
+        "mu",
+        "maz"
+      ]
+    },
+    {
+      "word": "çilek",
+      "emoji": "🍓",
+      "group": "yiyecek",
+      "also": [
+        "cilek",
+        "çile",
+        "lek"
+      ]
+    },
+    {
+      "word": "üzüm",
+      "emoji": "🍇",
+      "group": "yiyecek",
+      "also": [
+        "uzum",
+        "üzü",
+        "zum"
+      ]
+    },
+    {
+      "word": "karpuz",
+      "emoji": "🍉",
+      "group": "yiyecek",
+      "also": [
+        "karpu",
+        "kapuz",
+        "puz"
+      ]
+    },
+    {
+      "word": "ekmek",
+      "emoji": "🍞",
+      "group": "yiyecek",
+      "also": [
+        "ekme",
+        "emek",
+        "mek"
+      ]
+    },
+    {
+      "word": "süt",
+      "emoji": "🥛",
+      "group": "yiyecek",
+      "also": [
+        "sut",
+        "sü"
+      ]
+    },
+    {
+      "word": "peynir",
+      "emoji": "🧀",
+      "group": "yiyecek",
+      "also": [
+        "peyni",
+        "pener",
+        "nir"
+      ]
+    },
+    {
+      "word": "araba",
+      "emoji": "🚗",
+      "group": "eşya",
+      "also": [
+        "aaba",
+        "abba",
+        "araa"
+      ],
+      "cry": "düt düt"
+    },
+    {
+      "word": "top",
+      "emoji": "⚽",
+      "group": "eşya",
+      "also": [
+        "to",
+        "topp"
+      ]
+    },
+    {
+      "word": "ay",
+      "emoji": "🌙",
+      "group": "eşya",
+      "also": [
+        "aay"
+      ]
+    },
+    {
+      "word": "yıldız",
+      "emoji": "⭐",
+      "group": "eşya",
+      "also": [
+        "yildiz",
+        "yıldıs",
+        "dız"
+      ]
+    },
+    {
+      "word": "güneş",
+      "emoji": "☀️",
+      "group": "eşya",
+      "also": [
+        "gunes",
+        "güne",
+        "neş"
+      ]
+    },
+    {
+      "word": "çiçek",
+      "emoji": "🌸",
+      "group": "eşya",
+      "also": [
+        "cicek",
+        "çiçe",
+        "çek"
+      ]
+    },
+    {
+      "word": "ağaç",
+      "emoji": "🌳",
+      "group": "eşya",
+      "also": [
+        "agac",
+        "ağa",
+        "aaç"
+      ]
+    },
+    {
+      "word": "ev",
+      "emoji": "🏠",
+      "group": "eşya",
+      "also": [
+        "eev",
+        "eve"
+      ]
+    },
+    {
+      "word": "uçak",
+      "emoji": "✈️",
+      "group": "eşya",
+      "also": [
+        "ucak",
+        "uça",
+        "çak"
+      ],
+      "cry": "vıııın"
+    },
+    {
+      "word": "tren",
+      "emoji": "🚂",
+      "group": "eşya",
+      "also": [
+        "ten",
+        "tiren",
+        "tre"
+      ],
+      "cry": "çuf çuf"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- The grown-up's gate: a regular HTML page, two plain forms, no JavaScript
+     beyond three lines that surface a failed attempt from the query string.
+     The server answers each POST with a redirect — to /game on success, back
+     here with ?error= on failure. The child never sees this page. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>söyle</title>
+<style>
+  :root{ --bg:#fff8ec; --card:#fff; --ink:#2b2118; --dim:#9a8b78;
+         --no:#e4903f; color-scheme:light }
+  @media (prefers-color-scheme:dark){ :root{
+         --bg:#1a1511; --card:#241d17; --ink:#f6efe4; --dim:#8c7f6e;
+         --no:#f0a85c; color-scheme:dark } }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;margin:0;
+       display:flex;flex-direction:column;align-items:center;gap:22px;
+       font:600 16px/1.4 -apple-system,system-ui,sans-serif;padding:7vh 16px}
+  .card{background:var(--card);border-radius:24px;padding:28px;
+        width:min(92vw,380px);display:flex;flex-direction:column;gap:12px;
+        box-shadow:0 18px 50px -18px rgba(90,60,20,.4)}
+  h1{margin:0;font-size:30px} h2{margin:0;font-size:18px}
+  p{margin:0;color:var(--dim);font-weight:500;font-size:14px}
+  input,select{font:inherit;font-weight:500;padding:11px 14px;width:100%;
+        border-radius:12px;border:1.5px solid var(--dim);
+        background:var(--bg);color:var(--ink)}
+  button{font:inherit;font-size:18px;padding:13px;border-radius:999px;
+         border:0;background:var(--ink);color:var(--bg);cursor:pointer}
+  button:active{transform:scale(.97)}
+  .err{color:var(--no);font-size:14px;font-weight:500;min-height:1.2em;
+       text-align:center;width:min(92vw,380px)}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>söyle 🗣️</h1>
+    <p>A talking picture game for toddlers — Türkçe, по-русски, English.
+       A grown-up signs in once; after that it's all her voice.</p>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <form class="card" method="post" action="/login">
+    <h2>Sign in</h2>
+    <input name="email" type="email" placeholder="email"
+           autocomplete="username" required>
+    <input name="password" type="password" placeholder="password"
+           autocomplete="current-password" required>
+    <button>Sign in</button>
+  </form>
+
+  <form class="card" method="post" action="/signup">
+    <h2>New here? Create a family account</h2>
+    <input name="email" type="email" placeholder="email"
+           autocomplete="username" required>
+    <input name="password" type="password" placeholder="password (6+)"
+           autocomplete="new-password" minlength="6" required>
+    <input name="childName" type="text" placeholder="child's name">
+    <select name="lang">
+      <option value="tr">Türkçe</option>
+      <option value="ru">Русский</option>
+      <option value="en">English</option>
+    </select>
+    <button>Create account</button>
+  </form>
+
+<script>
+  const err = new URLSearchParams(location.search).get("error");
+  if (err) document.getElementById("err").textContent = err;
+</script>
+</body>
+</html>

@@ -1,4 +1,8 @@
 <!doctype html>
+<!-- The game, and only the game. The server hands this page out solely to a
+     signed-in session (otherwise it redirects to /), so nothing auth-shaped
+     lives here beyond the small leave button. All behaviour is in app.ts
+     (compiled to app.js); this file is the markup and the look. -->
 <html lang="tr">
 <head>
 <meta charset="utf-8">
@@ -40,54 +44,21 @@
   button:active{transform:scale(.96)}
   .skip{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
         background:transparent;color:var(--dim);font-size:15px;padding:10px 14px}
-  .bye{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
-       background:transparent;color:var(--dim);font-size:15px;padding:10px 14px}
+  .bye{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
+  .bye button{background:transparent;color:var(--dim);font-size:15px;padding:10px 14px}
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
-  /* the grown-up's gate: one small card, then never seen again */
-  .auth{background:var(--card);border-radius:24px;padding:28px;width:min(88vw,360px);
-        display:flex;flex-direction:column;gap:12px;
-        box-shadow:0 18px 50px -18px rgba(90,60,20,.4)}
-  .auth h1{margin:0;font-size:26px}
-  .auth p{margin:0;color:var(--dim);font-weight:500;font-size:14px}
-  .auth input,.auth select{font:inherit;font-weight:500;padding:11px 14px;
-        border-radius:12px;border:1.5px solid var(--dim);background:var(--bg);
-        color:var(--ink);width:100%}
-  .auth .err{color:var(--no);font-size:14px;min-height:1.2em;font-weight:500}
-  .auth .alt{background:transparent;color:var(--dim);font-size:14px;padding:4px}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
   <canvas id="confetti"></canvas>
-
-  <!-- the grown-up signs in once; the child never touches the screen -->
-  <div class="auth" id="auth" hidden>
-    <h1>söyle</h1>
-    <p id="authblurb">a talking picture game for toddlers</p>
-    <input id="email" type="email" placeholder="email" autocomplete="username">
-    <input id="password" type="password" placeholder="password (6+)"
-           autocomplete="current-password">
-    <input id="childName" type="text" placeholder="child's name" hidden>
-    <select id="langpick" hidden>
-      <option value="tr">Türkçe</option>
-      <option value="ru">Русский</option>
-      <option value="en">English</option>
-    </select>
-    <div class="err" id="autherr"></div>
-    <button id="authgo">Sign in</button>
-    <button class="alt" id="authswap">new here? create an account</button>
-  </div>
-
   <div class="stars" id="stars"></div>
-  <div class="card" id="card" hidden><span class="ring"></span><span class="emoji" id="emoji">🙂</span></div>
-  <div class="heard" id="heard" hidden>söyle</div>
-  <button id="go" hidden><span id="golabel">Başla</span></button>
+  <div class="card" id="card"><span class="ring"></span><span class="emoji" id="emoji">🙂</span></div>
+  <div class="heard" id="heard">söyle</div>
+  <button id="go"><span id="golabel">Başla</span></button>
   <button class="skip" id="skip" hidden>başka →</button>
-  <button class="bye" id="bye" hidden>×</button>
+  <form class="bye" method="post" action="/logout"><button>×</button></form>
 
-<!-- All behaviour lives in app.ts (compiled to app.js) — auth flow, mic
-     capture, playback, the wire protocol, confetti. This file is only the
-     markup and the look. -->
 <script src="app.js"></script>
 </body>
 </html>

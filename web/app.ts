@@ -1,9 +1,8 @@
-/* söyle — the browser half of the game.
+/* söyle — the browser half of the game (served only at /game, only to a
+ * signed-in session; the login page is plain HTML with no script at all).
  *
- * Everything intelligent lives on the server. This file does five jobs:
+ * Everything intelligent lives on the server. This file does four jobs:
  *
- *   0. GATE        the grown-up signs in once; the game socket is refused
- *                  without the session cookie that comes back.
  *   1. MICROPHONE  capture audio, downsample to 16 kHz, stream it over the
  *                  websocket as raw bytes.
  *   2. SPEAKER     receive 24 kHz PCM16 from the server and play it
@@ -53,58 +52,21 @@ let lang: Lang = qlang ?? "tr";
 const $ = <E extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as E;
 const card = $("card"), emoji = $("emoji"), heard = $("heard"), stars = $("stars");
 
-/* ── 0. GATE ──────────────────────────────────────────────────────────── */
-
-let signup = false;
-
-async function api(path: string, bodyObj?: unknown): Promise<Response> {
-  return fetch(path, bodyObj === undefined
-    ? { method: path === "/api/me" ? "GET" : "POST" }
-    : { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify(bodyObj) });
-}
-
-function showGame(user: Me): void {
+/* The server already refused this page to strangers; this fetch just brings
+ * the family's language and star count. A dead session mid-visit goes back
+ * to the login page. */
+async function hello(): Promise<void> {
+  const r = await fetch("/api/me");
+  if (!r.ok) { location.replace("/"); return; }
+  const user = await r.json() as Me;
   lang = qlang ?? user.lang;
   const t = T[lang]!;
-  $("auth").hidden = true;
-  for (const id of ["card", "heard", "go"]) $(id).hidden = false;
-  $("bye").hidden = false;
   $("golabel").textContent = t.go!;
   $("skip").textContent = t.skip!;
   heard.textContent = t.hint!;
   document.documentElement.lang = lang;
   stars.textContent = "⭐".repeat(Math.min(user.stars, 10));
 }
-
-async function gate(): Promise<void> {
-  const r = await api("/api/me");
-  if (r.ok) { showGame(await r.json() as Me); return; }
-  $("auth").hidden = false;
-}
-
-$("authswap").onclick = () => {
-  signup = !signup;
-  $("childName").hidden = !signup;
-  $("langpick").hidden = !signup;
-  $("authgo").textContent = signup ? "Create account" : "Sign in";
-  $("authswap").textContent = signup ? "have an account? sign in" : "new here? create an account";
-};
-
-$("authgo").onclick = async () => {
-  const email = ($<HTMLInputElement>("email")).value;
-  const password = ($<HTMLInputElement>("password")).value;
-  const payload = signup
-    ? { email, password, childName: ($<HTMLInputElement>("childName")).value,
-        lang: ($<HTMLSelectElement>("langpick")).value }
-    : { email, password };
-  const r = await api(signup ? "/api/signup" : "/api/login", payload);
-  const data = await r.json() as Me & { error?: string };
-  if (!r.ok) { $("autherr").textContent = data.error ?? "something went wrong"; return; }
-  showGame(data);
-};
-
-$("bye").onclick = async () => { await api("/api/logout", {}); location.reload(); };
 
 /* ── 1. MICROPHONE: hardware rate in, 16 kHz out, simple averaging ─────── */
 
@@ -264,4 +226,4 @@ async function start(): Promise<void> {
 
 $("go").onclick = () => { void start(); };
 $("skip").onclick = () => { if (ws?.readyState === 1) { flush(); ws.send("next"); } };
-void gate();
+void hello();

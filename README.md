@@ -103,8 +103,11 @@ npm start                   # → http://localhost:8600
   child never waits for a model.
 - [src/auth.ts](src/auth.ts) / [src/store.ts](src/store.ts) — families:
   scrypt, signed cookies, DynamoDB (or memory).
-- [web/app.ts](web/app.ts) — the browser half; its header documents the
-  whole wire protocol.
+- [web/login.html](web/login.html) — the sign-in gate at `/`: plain HTML
+  forms and redirects, no script. [web/game.html](web/game.html) — the game
+  at `/game`, served only to a signed-in session.
+- [web/app.ts](web/app.ts) — the game's browser half; its header documents
+  the whole wire protocol.
 - [decks/](decks/) — one data file per language: words, toddler alternates,
   animal cries, canned phrases. Adding a word is one line.
 - [infra/](infra/) — the CDK stack: Fargate behind an ALB speaking WSS, a

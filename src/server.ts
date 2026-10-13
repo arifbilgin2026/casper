@@ -1,7 +1,8 @@
 /* söyle — the server. One process, three jobs:
  *
- *   - serve the two static files the browser needs;
- *   - a tiny JSON auth API (signup / login / logout / me);
+ *   - two pages: / is a plain-HTML sign-in gate (form posts, redirects, no
+ *     script), /game is the game, handed out only to a signed-in session;
+ *   - the auth endpoints behind those forms, plus GET /api/me for the game;
  *   - one authenticated websocket per session, owned by a Game.
  *
  *     python? no — see README. This is the TypeScript implementation; the
@@ -43,21 +44,32 @@ const DECKS = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(
 
 const store = makeStore();
 
-// ── the little JSON API ───────────────────────────────────────────────────
+// ── pages, forms, and the one JSON endpoint the game page reads ──────────
 
-function body(req: IncomingMessage): Promise<Record<string, string>> {
+/** The sign-in gate is plain HTML, so its POSTs arrive form-encoded. */
+function form(req: IncomingMessage): Promise<Record<string, string>> {
   return new Promise((ok) => {
     let data = "";
     req.on("data", (c) => { data += c; if (data.length > 4096) req.destroy(); });
-    req.on("end", () => { try { ok(JSON.parse(data)); } catch { ok({}); } });
+    req.on("end", () => ok(Object.fromEntries(new URLSearchParams(data))));
   });
 }
 
-function json(res: ServerResponse, code: number, obj: unknown, cookie?: string): void {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+function page(res: ServerResponse, file: string): void {
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8",
+                       "cache-control": "no-store" });
+  res.end(readFileSync(path.join(HERE, "..", "web", file)));
+}
+
+function redirect(res: ServerResponse, to: string, cookie?: string): void {
+  const headers: Record<string, string> = { location: to };
   if (cookie) headers["set-cookie"] = cookie;
-  res.writeHead(code, headers);
-  res.end(JSON.stringify(obj));
+  res.writeHead(302, headers);
+  res.end();
+}
+
+function oops(res: ServerResponse, msg: string): void {
+  redirect(res, "/?error=" + encodeURIComponent(msg));
 }
 
 async function me(req: IncomingMessage): Promise<User | null> {
@@ -65,78 +77,70 @@ async function me(req: IncomingMessage): Promise<User | null> {
   return email ? store.get(email) : null;
 }
 
-const STATIC: Record<string, [string, string]> = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/app.js": ["app.js", "application/javascript; charset=utf-8"],
-};
-
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   try {
     if (url.pathname === "/health") { res.writeHead(200); res.end("ok\n"); return; }
 
-    const fileEntry = STATIC[url.pathname];
-    if (fileEntry && req.method === "GET") {
-      const [file, type] = fileEntry;
-      res.writeHead(200, { "content-type": type, "cache-control": "no-store" });
-      res.end(readFileSync(path.join(HERE, "..", "web", file)));
+    // The two pages. A session sees the game; a stranger sees the gate.
+    if (url.pathname === "/" && req.method === "GET") {
+      return await me(req) ? redirect(res, "/game") : page(res, "login.html");
+    }
+    if (url.pathname === "/game" && req.method === "GET") {
+      return await me(req) ? page(res, "game.html") : redirect(res, "/");
+    }
+    if (url.pathname === "/app.js" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/javascript; charset=utf-8",
+                           "cache-control": "no-store" });
+      res.end(readFileSync(path.join(HERE, "..", "web", "app.js")));
       return;
     }
 
-    if (url.pathname === "/api/signup" && req.method === "POST") {
-      const b = await body(req);
+    if (url.pathname === "/signup" && req.method === "POST") {
+      const b = await form(req);
       const email = (b.email ?? "").trim().toLowerCase();
       const lang = LANGS.includes(b.lang as Lang) ? (b.lang as Lang) : "tr";
-      if (!/^\S+@\S+\.\S+$/.test(email)) return json(res, 400, { error: "bad email" });
-      if ((b.password ?? "").length < 6) return json(res, 400, { error: "password too short" });
+      if (!/^\S+@\S+\.\S+$/.test(email)) return oops(res, "that email looks off");
+      if ((b.password ?? "").length < 6) return oops(res, "password needs 6 characters");
       const user: User = {
-        email, pw: hashPassword(b.password!), childName: (b.childName ?? "").trim() || "kiddo",
+        email, pw: hashPassword(b.password!),
+        childName: (b.childName ?? "").trim() || "kiddo",
         lang, stars: 0, mastered: [], createdAt: new Date().toISOString(),
       };
-      if (!await store.create(user)) return json(res, 409, { error: "account exists" });
-      return json(res, 200, publicUser(user), sessionCookie(makeSession(email)));
+      if (!await store.create(user)) return oops(res, "that account already exists — sign in above");
+      return redirect(res, "/game", sessionCookie(makeSession(email)));
     }
 
-    if (url.pathname === "/api/login" && req.method === "POST") {
-      const b = await body(req);
+    if (url.pathname === "/login" && req.method === "POST") {
+      const b = await form(req);
       const email = (b.email ?? "").trim().toLowerCase();
       const user = await store.get(email);
       if (!user || !checkPassword(b.password ?? "", user.pw)) {
-        return json(res, 401, { error: "wrong email or password" });
+        return oops(res, "wrong email or password");
       }
-      return json(res, 200, publicUser(user), sessionCookie(makeSession(email)));
+      return redirect(res, "/game", sessionCookie(makeSession(email)));
     }
 
-    if (url.pathname === "/api/logout" && req.method === "POST") {
-      return json(res, 200, {}, clearCookie());
+    if (url.pathname === "/logout" && req.method === "POST") {
+      return redirect(res, "/", clearCookie());
     }
 
+    // The game page fetches this once, for the family's language and stars.
     if (url.pathname === "/api/me" && req.method === "GET") {
       const user = await me(req);
-      return user ? json(res, 200, publicUser(user)) : json(res, 401, { error: "not signed in" });
-    }
-
-    if (url.pathname === "/api/lang" && req.method === "POST") {
-      const user = await me(req);
-      if (!user) return json(res, 401, { error: "not signed in" });
-      const b = await body(req);
-      if (!LANGS.includes(b.lang as Lang)) return json(res, 400, { error: "bad lang" });
-      await store.setLang(user.email, b.lang as Lang);
-      return json(res, 200, { ...publicUser(user), lang: b.lang });
+      if (!user) { res.writeHead(401); res.end(); return; }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ email: user.email, childName: user.childName,
+        lang: user.lang, stars: user.stars, mastered: user.mastered.length }));
+      return;
     }
 
     res.writeHead(404); res.end();
   } catch (e) {
     console.log("http error:", e);
-    if (!res.headersSent) json(res, 500, { error: "server error" });
+    if (!res.headersSent) { res.writeHead(500); res.end(); }
   }
 });
-
-function publicUser(u: User) {
-  return { email: u.email, childName: u.childName, lang: u.lang,
-           stars: u.stars, mastered: u.mastered.length };
-}
 
 // ── the game socket: one per child, refused without a session ────────────
 

@@ -5,87 +5,110 @@
 A web page shows one picture. A voice asks the child what it is. The child
 says it out loud. The voice reacts — praise, a star, confetti, the next
 picture — or gently asks again. Ages roughly 2–4; Turkish, Russian and
-English, same code. The child never touches the screen.
+English, same code. **The child never touches the screen** — the whole
+interaction is her voice and the agent's voice.
 
-## Why it started in Turkish and Russian
+**Hosted:** https://soyle.peachyvoice.com — sign up (any email works), allow
+the microphone, press Start, and say what you see. Use speakers rather than
+headphones: the game expects to hear the child while it talks.
+
+## Why it exists, and why Turkish and Russian came first
 
 This is a family project before it is a tech demo. Our daughter is a year and
 a half old, growing up between her mother's Russian and her father's Turkish —
-two languages, two alphabets, one toddler collecting her first words in both
-at once. We wanted something that would let her *practice saying things out
-loud* in each parent's language, with infinite patience and a small
-celebration every time she gets one out. Nothing on the market treats a
-pre-reader who can't touch-target as the only user in the room, so we built
-it: no buttons, no reading, just a picture and her voice. Turkish and Russian
-came first because that's who's at our dinner table; English joined as the
-third language the same way any language joins — a data file and a voice.
+two languages, one toddler collecting her first words in both at once. We
+wanted something that lets her *practice saying things out loud* in each
+parent's language, with infinite patience and a small celebration every time
+she gets one out. Nothing on the market treats a pre-reader who can't
+touch-target as the only user in the room. So: no buttons, no reading, just a
+picture and her voice. English joined the way any language joins — a data
+file, a voice id and a persona block.
 
-## Run it
+## The principle the code is judged on
 
-Prerequisites: Python 3.11+, the dialtone repo checked out next to this one
-(the voice library lives inside it), and two pip packages:
+**Anything that has a correct answer is computed. Only things that need
+judgement go to a model.**
+
+Whether "Кошка" is the same word as "кошка" is a string comparison: instant,
+free, testable, always right ([src/match.ts](src/match.ts)). Routing it
+through a model made it slower, more expensive *and wrong* — in testing, a
+child said the correct word three times and was not credited once. So code
+decides the verdict, the star, the advancement and the confetti; the model
+decides only what to *say* about it. [SPLIT.md](SPLIT.md) is the full note —
+it matters as much as the code.
+
+## Status note (what works / what's incomplete / how to run)
+
+**Works, verified on the hosted link:**
+- Parent signup/login (scrypt + HMAC-signed session cookie); the game socket
+  is refused without a session. Stars and mastered words persist per family
+  in DynamoDB across visits.
+- The full voice loop in three languages: live STT (Deepgram), a persona
+  (Claude Haiku on Bedrock) answering in a `{"think","say"}` envelope, and
+  streaming TTS (ElevenLabs), with the first clause spoken while the rest of
+  the model's reply is still arriving.
+- Code-owned guarantees: instant celebration on a correct answer (no model on
+  that path), answer-leak guard, repetition guard, narration detection, a
+  no-repeat deck, animal cries announced from data at every card flip.
+- Degradation: with the model slow, down or disabled (`SOYLE_NO_LLM=1`) the
+  game runs at full speed on prepared/canned lines.
+- 53 tests over the matcher, all three decks, the persona protocol and the
+  game guards: `npx vitest run` — no network or keys needed.
+
+**Incomplete / honest caveats:**
+- The scripted-child acceptance harness (synthesised toddler answers played
+  at the game) is designed but not built; acceptance was checked by hand.
+- `lang` on the profile is set at signup; the in-game language switcher is
+  just the `?lang=` query for now.
+- One Fargate task, no autoscaling — it is a family demo, not a product.
+- This project began as a Python prototype on an in-house voice library (it
+  is in the git history); everything in HEAD is the TypeScript
+  implementation, rebuilt for this submission.
+
+## Run it locally
+
+Node 22+. Two external services need keys (the voice itself); the model and
+the database degrade gracefully without AWS:
 
 ```sh
-pip install websockets boto3 httpx
+npm install
+DEEPGRAM_API_KEY=...        # deepgram.com — speech-to-text
+ELEVENLABS_API_KEY=...      # elevenlabs.io — the voice
+npm start                   # → http://localhost:8600
 ```
 
-Keys, read from the environment:
+- No `SOYLE_TABLE` set → accounts live in memory (everything works, nothing
+  survives a restart).
+- No AWS credentials → set `SOYLE_NO_LLM=1` and the persona runs on canned
+  lines; with credentials, Bedrock (Claude Haiku) writes the lines.
+- `npx vitest run` for the tests; no keys needed.
 
-| variable | what for |
-|---|---|
-| `DEEPGRAM_API_KEY` | speech-to-text (model `nova-2`) |
-| `ELEVENLABS_API_KEY` | the voice (`eleven_turbo_v2_5`) |
-| AWS credentials, Bedrock in `us-east-1` | the persona (Haiku 4.5) |
-| `SOYLE_NO_LLM=1` | optional: run with the model disabled, canned lines only |
+## How it's put together
 
-Then:
-
-```sh
-python -m soyle.server
-# →  http://localhost:8600          Türkçe
-# →  http://localhost:8600/?lang=ru по-русски
-# →  http://localhost:8600/?lang=en English
+```
+  microphone ──► ears (Deepgram) ──► matcher ──┐
+                                               ├──► game state ──► persona (LLM)
+  screen state, score, timers ─────────────────┘         │
+                                                         ▼
+                        mouth (ElevenLabs + chimes) ◄── {"think","say"}
 ```
 
-Open it in a browser, allow the microphone, and say what you see. The browser
-side is two static files: [soyle/web/index.html](soyle/web/index.html) is the
-markup and the look, and [soyle/web/app.js](soyle/web/app.js) is the behaviour
-— microphone capture and downsampling, gapless playback, the five-message wire
-protocol, confetti. app.js is deliberately written as documentation: the whole
-client/server contract is in its header comment. Everything intelligent
-happens server-side over the one websocket.
+- [src/game.ts](src/game.ts) — the loop: a 200 ms tick, gated so the persona
+  only ever acts into a silence; every guard the hard way taught us.
+- [src/match.ts](src/match.ts) — the verdict. Forgiving about pronunciation,
+  strict about identity.
+- [src/persona.ts](src/persona.ts) — who the agent is, the think/say
+  envelope, the strict mark parser.
+- [src/chatter.ts](src/chatter.ts) — lines prepared in the background, so a
+  child never waits for a model.
+- [src/auth.ts](src/auth.ts) / [src/store.ts](src/store.ts) — families:
+  scrypt, signed cookies, DynamoDB (or memory).
+- [web/app.ts](web/app.ts) — the browser half; its header documents the
+  whole wire protocol.
+- [decks/](decks/) — one data file per language: words, toddler alternates,
+  animal cries, canned phrases. Adding a word is one line.
+- [infra/](infra/) — the CDK stack: Fargate behind an ALB speaking WSS, a
+  certificate, a DNS name, one DynamoDB table.
 
-The import of the voice library expects `~/workspace/dialtone` (see the top of
-[soyle/server.py](soyle/server.py)). The standalone `voicecore` repo is a stale
-extraction and is not used.
-
-## Tests
-
-```sh
-python -m pytest tests/
-```
-
-They cover the matcher (the part that must never regress), the whole deck in
-both languages (no word fails itself, no alternate is rejected, zero
-cross-matches, no canned prompt contains an answer), and the persona line
-protocol (marks run in written order, unknown marks are stripped and never
-spoken, narration is detected). No network, no keys needed.
-
-## Adding a word, adding a language
-
-The deck, the canned phrases and the animal cries live in one data file per
-language: [soyle/words_tr.json](soyle/words_tr.json),
-[soyle/words_ru.json](soyle/words_ru.json),
-[soyle/words_en.json](soyle/words_en.json). Adding a word is one line (`word`,
-`emoji`, `also` — what a toddler plausibly says instead, `cry` — what the
-animal says, spoken the moment the card appears). Adding a language is a new
-data file, a voice id in `VOICES`, and one persona block (`WHO`/`HOW`/`_TXT`
-in [soyle/persona.py](soyle/persona.py)) — the prompts are the one part of a
-language that is judgement, not data. English was added exactly this way.
-
-## Why the code is shaped like this
-
-See [SPLIT.md](SPLIT.md). The one-sentence version: **anything with a correct
-answer is computed; only things that need judgement go to the model** — and
-when the model is slow, down, or switched off, prepared or canned lines keep
-the game at full speed, because a child never waits for a model.
+Privacy: no recordings are kept, nothing about the child is stored beyond a
+first name and star counts, and the browser stores only the session cookie.

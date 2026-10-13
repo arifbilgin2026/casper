@@ -1,0 +1,44 @@
+{
+  "name": "soyle",
+  "version": "1.0.0",
+  "description": "*Demo project for the Casper interview.*",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "esbuild web/app.ts --bundle --outfile=web/app.js && tsc --noEmit",
+    "start": "tsx src/server.ts",
+    "prestart": "esbuild web/app.ts --bundle --outfile=web/app.js --log-level=warning"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arifbilgin2026/casper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/arifbilgin2026/casper/issues"
+  },
+  "homepage": "https://github.com/arifbilgin2026/casper#readme",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1151.0",
+    "@aws-sdk/client-dynamodb": "^3.1151.0",
+    "@aws-sdk/lib-dynamodb": "^3.1151.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/ws": "^8.18.2",
+    "aws-cdk": "^2.1145.0",
+    "aws-cdk-lib": "^2.273.0",
+    "constructs": "^10.8.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  }
+}

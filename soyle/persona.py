@@ -36,6 +36,9 @@ WHO = {
     "ru": ("Ты взрослый, сидишь рядом с ребёнком 2-4 лет и показываешь ему "
            "картинки. Тёплый, весёлый, терпеливый. Говоришь очень коротко — "
            "одно предложение. Оставляешь ребёнку тишину, чтобы подумать."),
+    "en": ("You are a grown-up sitting next to a 2-4 year old child, showing "
+           "them picture cards. Warm, cheerful, patient. You speak very "
+           "briefly — one sentence. You leave the child silence to think."),
 }
 
 HOW = {
@@ -130,48 +133,115 @@ DİĞER KURALLAR
 - Если на экране есть (звук: ...) — используй его как подсказку: изобрази
   звук, потом спроси.
 """,
+    "en": """
+HOW YOU ANSWER
+You write ONE line of JSON and nothing else:
+  {"think": "a short note to yourself, 8 words max", "say": "the sentence you speak ALOUD"}
+
+Inside "say" you may also put:
+  ♪confetti♪ ♪yes♪ ♪again♪ ♪hello♪   plays a short sound
+  [card:word]                     shows that picture
+  [star]                          gives a star
+If the child is QUIET and you just spoke: {"think": "let them think", "say": "PASS"}
+
+"say" COMES OUT OF THE SPEAKER — the child hears every word of it. Thoughts,
+plans and rules go ONLY in "think". These must NEVER appear in "say":
+  "The child spoke, I must reply"   "Waiting for the answer"   "I'm listening"
+  "Encourage them, don't say the word"   "Praise and show a new card"
+Two examples (format only — NEVER copy the words, write your own about the
+card on screen):
+  {"think": "correct, celebrate, new card", "say": "♪confetti♪ Well done! [star] And what's this? [card:cat]"}
+  {"think": "second try", "say": "Almost! Say it again?"}
+A hint must be about the card ON SCREEN, never about a different animal.
+Never repeat the same sentence twice in a row — vary it every time.
+
+THE TWO MOST IMPORTANT RULES
+1. If the child said something, you MUST answer. PASS is FORBIDDEN then.
+2. Every answer needs WORDS. Never just [card:...] on its own — the child
+   will not understand what happened.
+
+RIGHT OR WRONG — ALREADY DECIDED FOR YOU
+Next to what the child said there is a note. Trust it completely, never
+re-check it yourself.
+  "THIS IS CORRECT" → celebrate, give [star], play ♪confetti♪ and open a new
+                      card with [card:...]. This is mandatory.
+  "NOT that word"   → encourage, do not say the word, keep the card.
+
+OTHER RULES
+- One sentence, eight words at most. No emoji, no quotes.
+- Do NOT say the word on screen — the child will say it.
+- Said it right: celebrate, [star], play ♪yes♪, then open [card:new].
+- Wrong or unclear: encourage, without saying the word.
+- After three tries: say the word yourself and open a new card.
+- Child quiet and you just spoke: PASS. Wait.
+- Never reopen cards you already showed.
+- Funny noises are welcome: "whee", "wow", "pop pop". Children love them.
+- If the screen shows (sound: ...), use it as a hint: make the sound, then ask.
+""",
+}
+
+
+#: The state label strings, one block per language. Adding a language is a new
+#: block here, a WHO/HOW pair above, and a words_<lang>.json — nothing else.
+_TXT = {
+    "tr": dict(
+        none="yok", cry="sesi", ok=" — BU DOĞRU", no=" — bu kelime DEĞİL",
+        talking="çocuk ŞU AN konuşuyor",
+        waiting="az önce cevap verdi, seni bekliyor",
+        quiet="{q:.1f}sn sessiz",
+        mine="Sen geçen sefer dedin: {s}\n", nothing="hiç",
+        body=("Ekranda: {on}\nYıldız: {score}\nBu kartta deneme: {tries}\n"
+              "Çocuk dedi: {said}\nŞu an: {live}\n"
+              "Sen {u:.1f}sn önce konuştun\nGösterilenler: {seen}\n"
+              "Gösterilebilir: {left}")),
+    "ru": dict(
+        none="нет", cry="звук", ok=" — ЭТО ПРАВИЛЬНО", no=" — это НЕ то слово",
+        talking="ребёнок ГОВОРИТ сейчас",
+        waiting="только что ответил, ждёт тебя",
+        quiet="молчит {q:.1f}с",
+        mine="Ты сказал в прошлый раз: {s}\n", nothing="ничего",
+        body=("На экране: {on}\nЗвёздочек: {score}\nПопыток на этой карточке: {tries}\n"
+              "Ребёнок сказал: {said}\nСейчас: {live}\n"
+              "Ты говорил {u:.1f}с назад\nУже показывали: {seen}\n"
+              "Можно показать: {left}")),
+    "en": dict(
+        none="none", cry="sound", ok=" — THIS IS CORRECT", no=" — NOT that word",
+        talking="the child is SPEAKING right now",
+        waiting="just answered, waiting for you",
+        quiet="quiet for {q:.1f}s",
+        mine="You said last time: {s}\n", nothing="none yet",
+        body=("On screen: {on}\nStars: {score}\nTries this card: {tries}\n"
+              "The child said: {said}\nRight now: {live}\n"
+              "You spoke {u:.1f}s ago\nAlready shown: {seen}\n"
+              "Available: {left}")),
 }
 
 
 def state_text(lang: str, *, card, score, heard, talking, quiet_s,
                since_us, tries, seen, deck, last_said="", verdict=None) -> str:
     """What the persona is shown. Compact on purpose — it is sent every tick."""
-    L = lang == "ru"
+    T = _TXT.get(lang, _TXT["tr"])
     if card:
         on = f"{card['emoji']} {card['word']}"
         if card.get("cry"):
-            on += (f" (звук: {card['cry']})" if L else f" (sesi: {card['cry']})")
+            on += f" ({T['cry']}: {card['cry']})"
     else:
-        on = "нет" if L else "yok"
+        on = T["none"]
     # The verdict is computed, not guessed: whether the word matches is a
     # string question with a right answer, and a model is the wrong tool for it.
-    if heard:
-        mark = {True: (" — ЭТО ПРАВИЛЬНО" if L else " — BU DOĞRU"),
-                False: (" — это НЕ то слово" if L else " — bu kelime DEĞİL"),
-                None: ""}[verdict]
-        said = f"{heard}{mark}"
-    else:
-        said = "—"
+    said = heard + {True: T["ok"], False: T["no"], None: ""}[verdict] if heard else "—"
     if talking:
-        live = "ребёнок ГОВОРИТ сейчас" if L else "çocuk ŞU AN konuşuyor"
+        live = T["talking"]
     elif heard:
         # Never tell her she is quiet while her answer is sitting unanswered.
-        live = ("только что ответил, ждёт тебя" if L
-                else "az önce cevap verdi, seni bekliyor")
+        live = T["waiting"]
     else:
-        live = f"молчит {quiet_s:.1f}с" if L else f"{quiet_s:.1f}sn sessiz"
+        live = T["quiet"].format(q=quiet_s)
     left = [w["word"] for w in deck if w["word"] not in seen][:40]
-    if L:
-        mine = f"Ты сказал в прошлый раз: {last_said}\n" if last_said else ""
-        return (mine + f"На экране: {on}\nЗвёздочек: {score}\nПопыток на этой карточке: {tries}\n"
-                f"Ребёнок сказал: {said}\nСейчас: {live}\n"
-                f"Ты говорил {since_us:.1f}с назад\nУже показывали: "
-                f"{', '.join(sorted(seen)) or 'ничего'}\nМожно показать: {', '.join(left)}")
-    mine = f"Sen geçen sefer dedin: {last_said}\n" if last_said else ""
-    return (mine + f"Ekranda: {on}\nYıldız: {score}\nBu kartta deneme: {tries}\n"
-            f"Çocuk dedi: {said}\nŞu an: {live}\n"
-            f"Sen {since_us:.1f}sn önce konuştun\nGösterilenler: "
-            f"{', '.join(sorted(seen)) or 'hiç'}\nGösterilebilir: {', '.join(left)}")
+    mine = T["mine"].format(s=last_said) if last_said else ""
+    return mine + T["body"].format(
+        on=on, score=score, tries=tries, said=said, live=live, u=since_us,
+        seen=", ".join(sorted(seen)) or T["nothing"], left=", ".join(left))
 
 
 def system(lang: str) -> str:
@@ -191,6 +261,8 @@ NARRATION = (
     # the agent are never speech for her.
     "cesaretlendir", "kutla", "kelimeyi", "kartı", "tutturamadı", "denemesini",
     "подбодри", "похвали", "попроси", "не называй", "не меняй",
+    "the child", "encourage", "praise", "don't say", "do not say",
+    "waiting for", "i should", "i must",
 )
 
 

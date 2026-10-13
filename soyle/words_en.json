@@ -1,0 +1,599 @@
+{
+  "_comment": "English deck. Same pictures, same rules: 'also' is what a toddler plausibly says instead — w-for-r substitutions, dropped syllables, pet forms. 'cry' is spoken by code the moment the card appears.",
+  "phrases": {
+    "_comment": "Canned lines for when the model is slow, down, or disabled. ask/again must not contain any deck word — the deck test enforces it.",
+    "ask": [
+      "Look, what's this?",
+      "What is it?",
+      "Can you tell me what this is?",
+      "And what's this one?",
+      "What do we call this?"
+    ],
+    "yes": [
+      "Well done!",
+      "Yes, that's right!",
+      "You said it so nicely!",
+      "Wonderful!",
+      "That's it, bravo!"
+    ],
+    "again": [
+      "Try once more.",
+      "Say it one more time.",
+      "Almost! Try again.",
+      "Hmm, can you say it again?",
+      "Come on, one more time!"
+    ]
+  },
+  "words": [
+    {
+      "word": "cat",
+      "emoji": "🐱",
+      "group": "hayvan",
+      "also": [
+        "tat",
+        "kitty"
+      ],
+      "cry": "meow meow"
+    },
+    {
+      "word": "dog",
+      "emoji": "🐶",
+      "group": "hayvan",
+      "also": [
+        "gog",
+        "doggy"
+      ],
+      "cry": "woof woof"
+    },
+    {
+      "word": "horse",
+      "emoji": "🐴",
+      "group": "hayvan",
+      "also": [
+        "hoss",
+        "horsey"
+      ],
+      "cry": "neigh"
+    },
+    {
+      "word": "cow",
+      "emoji": "🐄",
+      "group": "hayvan",
+      "also": [
+        "cowie"
+      ],
+      "cry": "moo moo"
+    },
+    {
+      "word": "sheep",
+      "emoji": "🐑",
+      "group": "hayvan",
+      "also": [
+        "seep"
+      ],
+      "cry": "baa baa"
+    },
+    {
+      "word": "goat",
+      "emoji": "🐐",
+      "group": "hayvan",
+      "also": [
+        "gote"
+      ],
+      "cry": "maa maa"
+    },
+    {
+      "word": "chicken",
+      "emoji": "🐔",
+      "group": "hayvan",
+      "also": [
+        "chickie"
+      ],
+      "cry": "cluck cluck"
+    },
+    {
+      "word": "chick",
+      "emoji": "🐤",
+      "group": "hayvan",
+      "also": [
+        "chickie baby"
+      ],
+      "cry": "cheep cheep"
+    },
+    {
+      "word": "rooster",
+      "emoji": "🐓",
+      "group": "hayvan",
+      "also": [
+        "rooter"
+      ],
+      "cry": "cock-a-doodle-doo"
+    },
+    {
+      "word": "bird",
+      "emoji": "🐦",
+      "group": "hayvan",
+      "also": [
+        "birdie"
+      ],
+      "cry": "tweet tweet"
+    },
+    {
+      "word": "duck",
+      "emoji": "🦆",
+      "group": "hayvan",
+      "also": [
+        "guck",
+        "ducky"
+      ],
+      "cry": "quack quack"
+    },
+    {
+      "word": "owl",
+      "emoji": "🦉",
+      "group": "hayvan",
+      "also": [
+        "owly"
+      ],
+      "cry": "hoo hoo"
+    },
+    {
+      "word": "parrot",
+      "emoji": "🦜",
+      "group": "hayvan",
+      "also": [
+        "pawwot"
+      ]
+    },
+    {
+      "word": "penguin",
+      "emoji": "🐧",
+      "group": "hayvan",
+      "also": [
+        "pengin"
+      ]
+    },
+    {
+      "word": "pig",
+      "emoji": "🐷",
+      "group": "hayvan",
+      "also": [
+        "piggy"
+      ],
+      "cry": "oink oink"
+    },
+    {
+      "word": "mouse",
+      "emoji": "🐭",
+      "group": "hayvan",
+      "also": [
+        "mousey"
+      ],
+      "cry": "squeak squeak"
+    },
+    {
+      "word": "rabbit",
+      "emoji": "🐰",
+      "group": "hayvan",
+      "also": [
+        "wabbit",
+        "bunny"
+      ]
+    },
+    {
+      "word": "bear",
+      "emoji": "🐻",
+      "group": "hayvan",
+      "also": [
+        "beawr"
+      ],
+      "cry": "grrr"
+    },
+    {
+      "word": "panda",
+      "emoji": "🐼",
+      "group": "hayvan"
+    },
+    {
+      "word": "koala",
+      "emoji": "🐨",
+      "group": "hayvan",
+      "also": [
+        "kowala"
+      ]
+    },
+    {
+      "word": "lion",
+      "emoji": "🦁",
+      "group": "hayvan",
+      "also": [
+        "wion"
+      ],
+      "cry": "roarrr"
+    },
+    {
+      "word": "tiger",
+      "emoji": "🐯",
+      "group": "hayvan",
+      "also": [
+        "tiga"
+      ],
+      "cry": "roarrr"
+    },
+    {
+      "word": "monkey",
+      "emoji": "🐵",
+      "group": "hayvan",
+      "also": [
+        "monk monk"
+      ],
+      "cry": "ooh ooh ah ah"
+    },
+    {
+      "word": "elephant",
+      "emoji": "🐘",
+      "group": "hayvan",
+      "also": [
+        "efant",
+        "ellafant"
+      ],
+      "cry": "toot toooot"
+    },
+    {
+      "word": "giraffe",
+      "emoji": "🦒",
+      "group": "hayvan",
+      "also": [
+        "raffe",
+        "giraf"
+      ]
+    },
+    {
+      "word": "zebra",
+      "emoji": "🦓",
+      "group": "hayvan",
+      "also": [
+        "zeeba"
+      ]
+    },
+    {
+      "word": "camel",
+      "emoji": "🐫",
+      "group": "hayvan",
+      "also": [
+        "camo"
+      ]
+    },
+    {
+      "word": "wolf",
+      "emoji": "🐺",
+      "group": "hayvan",
+      "also": [
+        "wuf"
+      ],
+      "cry": "awoooo"
+    },
+    {
+      "word": "fox",
+      "emoji": "🦊",
+      "group": "hayvan",
+      "also": [
+        "foxy"
+      ]
+    },
+    {
+      "word": "hedgehog",
+      "emoji": "🦔",
+      "group": "hayvan",
+      "also": [
+        "hedgy"
+      ]
+    },
+    {
+      "word": "squirrel",
+      "emoji": "🐿️",
+      "group": "hayvan",
+      "also": [
+        "skwirl",
+        "squirl"
+      ]
+    },
+    {
+      "word": "kangaroo",
+      "emoji": "🦘",
+      "group": "hayvan",
+      "also": [
+        "roo"
+      ]
+    },
+    {
+      "word": "frog",
+      "emoji": "🐸",
+      "group": "hayvan",
+      "also": [
+        "fwog",
+        "froggy"
+      ],
+      "cry": "ribbit ribbit"
+    },
+    {
+      "word": "turtle",
+      "emoji": "🐢",
+      "group": "hayvan",
+      "also": [
+        "turtu",
+        "tuttle"
+      ]
+    },
+    {
+      "word": "snake",
+      "emoji": "🐍",
+      "group": "hayvan",
+      "also": [
+        "nake"
+      ],
+      "cry": "hissss"
+    },
+    {
+      "word": "crocodile",
+      "emoji": "🐊",
+      "group": "hayvan",
+      "also": [
+        "croc",
+        "cwoc"
+      ]
+    },
+    {
+      "word": "fish",
+      "emoji": "🐟",
+      "group": "hayvan",
+      "also": [
+        "fishy"
+      ]
+    },
+    {
+      "word": "shark",
+      "emoji": "🦈",
+      "group": "hayvan",
+      "also": [
+        "sark",
+        "sharky"
+      ]
+    },
+    {
+      "word": "whale",
+      "emoji": "🐋",
+      "group": "hayvan",
+      "also": [
+        "wale"
+      ]
+    },
+    {
+      "word": "dolphin",
+      "emoji": "🐬",
+      "group": "hayvan",
+      "also": [
+        "dolfin"
+      ]
+    },
+    {
+      "word": "octopus",
+      "emoji": "🐙",
+      "group": "hayvan",
+      "also": [
+        "octo"
+      ]
+    },
+    {
+      "word": "crab",
+      "emoji": "🦀",
+      "group": "hayvan",
+      "also": [
+        "cwab"
+      ]
+    },
+    {
+      "word": "seal",
+      "emoji": "🦭",
+      "group": "hayvan",
+      "also": [
+        "seely"
+      ]
+    },
+    {
+      "word": "butterfly",
+      "emoji": "🦋",
+      "group": "hayvan",
+      "also": [
+        "buttfly",
+        "flutterby"
+      ]
+    },
+    {
+      "word": "bee",
+      "emoji": "🐝",
+      "group": "hayvan",
+      "also": [
+        "beee"
+      ],
+      "cry": "buzz buzz"
+    },
+    {
+      "word": "ant",
+      "emoji": "🐜",
+      "group": "hayvan",
+      "also": [
+        "anty"
+      ]
+    },
+    {
+      "word": "ladybug",
+      "emoji": "🐞",
+      "group": "hayvan",
+      "also": [
+        "ladybird"
+      ]
+    },
+    {
+      "word": "snail",
+      "emoji": "🐌",
+      "group": "hayvan",
+      "also": [
+        "snaily"
+      ]
+    },
+    {
+      "word": "apple",
+      "emoji": "🍎",
+      "group": "yiyecek",
+      "also": [
+        "appo"
+      ]
+    },
+    {
+      "word": "banana",
+      "emoji": "🍌",
+      "group": "yiyecek",
+      "also": [
+        "nana",
+        "banan"
+      ]
+    },
+    {
+      "word": "strawberry",
+      "emoji": "🍓",
+      "group": "yiyecek",
+      "also": [
+        "berry",
+        "stawbry"
+      ]
+    },
+    {
+      "word": "grapes",
+      "emoji": "🍇",
+      "group": "yiyecek",
+      "also": [
+        "grape",
+        "gapes"
+      ]
+    },
+    {
+      "word": "watermelon",
+      "emoji": "🍉",
+      "group": "yiyecek",
+      "also": [
+        "melon"
+      ]
+    },
+    {
+      "word": "bread",
+      "emoji": "🍞",
+      "group": "yiyecek",
+      "also": [
+        "bwead"
+      ]
+    },
+    {
+      "word": "milk",
+      "emoji": "🥛",
+      "group": "yiyecek",
+      "also": [
+        "milky"
+      ]
+    },
+    {
+      "word": "cheese",
+      "emoji": "🧀",
+      "group": "yiyecek",
+      "also": [
+        "cheesy"
+      ]
+    },
+    {
+      "word": "car",
+      "emoji": "🚗",
+      "group": "eşya",
+      "also": [
+        "cah"
+      ],
+      "cry": "beep beep"
+    },
+    {
+      "word": "ball",
+      "emoji": "⚽",
+      "group": "eşya",
+      "also": [
+        "baw",
+        "ballie"
+      ]
+    },
+    {
+      "word": "moon",
+      "emoji": "🌙",
+      "group": "eşya",
+      "also": [
+        "moo",
+        "moom"
+      ]
+    },
+    {
+      "word": "star",
+      "emoji": "⭐",
+      "group": "eşya",
+      "also": [
+        "staw"
+      ]
+    },
+    {
+      "word": "sun",
+      "emoji": "☀️",
+      "group": "eşya",
+      "also": [
+        "sunny"
+      ]
+    },
+    {
+      "word": "flower",
+      "emoji": "🌸",
+      "group": "eşya",
+      "also": [
+        "fower",
+        "flowa"
+      ]
+    },
+    {
+      "word": "tree",
+      "emoji": "🌳",
+      "group": "eşya",
+      "also": [
+        "twee"
+      ]
+    },
+    {
+      "word": "house",
+      "emoji": "🏠",
+      "group": "eşya",
+      "also": [
+        "howse"
+      ]
+    },
+    {
+      "word": "plane",
+      "emoji": "✈️",
+      "group": "eşya",
+      "also": [
+        "pwane"
+      ],
+      "cry": "zoom zoom"
+    },
+    {
+      "word": "train",
+      "emoji": "🚂",
+      "group": "eşya",
+      "also": [
+        "twain"
+      ],
+      "cry": "choo choo"
+    }
+  ]
+}

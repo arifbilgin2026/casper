@@ -44,10 +44,11 @@ from .sounds import CUES                               # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 PORT = 8600
-VOICES = {"tr": "Et3hA9mm8aHhswBL5jmC", "ru": "GN4wbsbejSnGSa1AzjH5"}
+VOICES = {"tr": "Et3hA9mm8aHhswBL5jmC", "ru": "GN4wbsbejSnGSa1AzjH5",
+          "en": "21m00Tcm4TlvDq8ikWAM"}
 
 _DATA = {c: json.loads((HERE / f"words_{c}.json").read_text())
-         for c in ("tr", "ru")}
+         for c in ("tr", "ru", "en")}
 DECKS = {c: d["words"] for c, d in _DATA.items()}
 PHRASES = {c: d["phrases"] for c, d in _DATA.items()}
 ALL = {c: [w["word"] for w in d] for c, d in DECKS.items()}
@@ -603,6 +604,13 @@ def http(connection, request):
                         Headers([("Content-Type", "text/html; charset=utf-8"),
                                  ("Content-Length", str(len(body))),
                                  ("Cache-Control", "no-store")]), body)
+    if path == "/app.js":
+        body = (HERE / "web" / "app.js").read_bytes()
+        return Response(HTTPStatus.OK, "OK",
+                        Headers([("Content-Type",
+                                  "application/javascript; charset=utf-8"),
+                                 ("Content-Length", str(len(body))),
+                                 ("Cache-Control", "no-store")]), body)
     return None
 
 
@@ -610,7 +618,8 @@ async def main() -> None:
     async with serve(handle, "0.0.0.0", PORT, process_request=http,
                      server_header=None, max_size=2 ** 20):
         print(f"söyle → http://localhost:{PORT}        (Türkçe)\n"
-              f"       → http://localhost:{PORT}/?lang=ru  (по-русски)",
+              f"       → http://localhost:{PORT}/?lang=ru  (по-русски)\n"
+              f"       → http://localhost:{PORT}/?lang=en  (English)",
               flush=True)
         await asyncio.Future()
 

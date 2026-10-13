@@ -11,7 +11,7 @@ from soyle.match import heard_it, norm
 
 HERE = pathlib.Path(__file__).resolve().parent.parent / "soyle"
 DATA = {lang: json.loads((HERE / f"words_{lang}.json").read_text())
-        for lang in ("tr", "ru")}
+        for lang in ("tr", "ru", "en")}
 LANGS = list(DATA)
 
 

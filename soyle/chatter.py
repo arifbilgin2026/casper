@@ -26,24 +26,33 @@ SYSTEM = {
            "ТОЛЬКО по-русски. Одно предложение, максимум восемь слов, "
            "разговорно. Без эмодзи, без кавычек, без пояснений — только "
            "сама фраза."),
+    "en": ("You are a warm, cheerful voice talking with a 2-4 year old. "
+           "ONLY English. One sentence, eight words at most, conversational. "
+           "No emoji, no quotes, no explanations — only the sentence itself."),
 }
 
 TASK = {
     "ask": {
         "tr": "Çocuğa resimdeki '{w}' kelimesini söylet. Kelimeyi SEN SÖYLEME.",
         "ru": "Попроси ребёнка назвать картинку: '{w}'. САМО СЛОВО НЕ НАЗЫВАЙ.",
+        "en": "Get the child to say the picture's word: '{w}'. Do NOT say "
+              "the word yourself.",
     },
     "yes": {
         "tr": "Çocuk '{w}' dedi ve doğru. Onu kutla ve {w} hakkında çok kısa, "
               "sevimli bir şey ekle.",
         "ru": "Ребёнок сказал '{w}' — правильно! Похвали и добавь очень "
               "коротко что-нибудь милое про {w}.",
+        "en": "The child said '{w}' and it is right. Celebrate, then add one "
+              "very short sweet thing about {w}.",
     },
     "again": {
         "tr": "Çocuk '{w}' demeye çalıştı ama tutturamadı. Cesaretlendir, "
               "tekrar denemesini iste. Kelimeyi SÖYLEME.",
         "ru": "Ребёнок пытался сказать '{w}', но не вышло. Подбодри и попроси "
               "попробовать ещё. САМО СЛОВО НЕ НАЗЫВАЙ.",
+        "en": "The child tried to say '{w}' but did not get it. Cheer them on "
+              "to try again. Do NOT say the word.",
     },
 }
 

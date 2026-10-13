@@ -1,5 +1,7 @@
 # söyle — a talking picture game for toddlers
 
+*Demo project for the Casper interview.*
+
 A web page shows one picture. A voice asks the child what it is. The child
 says it out loud. The voice reacts — praise, a star, confetti, the next
 picture — or gently asks again. Ages roughly 2–4, Turkish and Russian, same

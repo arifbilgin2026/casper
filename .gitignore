@@ -228,3 +228,6 @@ node_modules/
 dist/
 web/app.js
 infra/cdk.out/
+
+# STT bench audio cache
+.bench-cache/

@@ -3,8 +3,8 @@
  *
  * Everything intelligent lives on the server. This file does four jobs:
  *
- *   1. MICROPHONE  capture audio, downsample to 16 kHz, stream it over the
- *                  websocket as raw bytes.
+ *   1. MICROPHONE  capture audio on the AUDIO thread (mic-worklet.js), 16 kHz,
+ *                  20 ms chunks, streamed over the websocket as raw bytes.
  *   2. SPEAKER     receive 24 kHz PCM16 from the server and play it
  *                  gaplessly, in order.
  *   3. SCREEN      react to five tiny JSON messages (the whole protocol).
@@ -68,28 +68,7 @@ async function hello(): Promise<void> {
   stars.textContent = "⭐".repeat(Math.min(user.stars, 10));
 }
 
-/* ── 1. MICROPHONE: hardware rate in, 16 kHz out, simple averaging ─────── */
-
-function down(f: Float32Array, rate: number): Float32Array {
-  if (rate === IN) return f;
-  const r = rate / IN, out = new Float32Array(Math.round(f.length / r));
-  for (let i = 0; i < out.length; i++) {
-    const a = Math.round(i * r), b = Math.min(Math.round((i + 1) * r), f.length);
-    let s = 0;
-    for (let j = a; j < b; j++) s += f[j]!;
-    out[i] = s / Math.max(1, b - a);
-  }
-  return out;
-}
-
-function pcm16(f: Float32Array): ArrayBuffer {
-  const b = new ArrayBuffer(f.length * 2), v = new DataView(b);
-  for (let i = 0; i < f.length; i++) {
-    const s = Math.max(-1, Math.min(1, f[i]!));
-    v.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return b;
-}
+/* ── 1. MICROPHONE: see startMic() below and mic-worklet.js ───────────── */
 
 /* ── 2. SPEAKER: schedule each chunk to start when the last one ends ───── */
 
@@ -168,9 +147,13 @@ async function start(): Promise<void> {
   const t = T[lang]!;
   let mic: MediaStream;
   try {
+    // Noise suppression is OFF on purpose: browsers' suppressors treat a short
+    // quiet word as noise and clip its onset, and a one-syllable word is
+    // mostly onset. Echo cancellation stays (the speakers are right there) and
+    // so does auto-gain, which lifts a toddler's quiet voice to a usable level.
     mic = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: true,
-      noiseSuppression: true, autoGainControl: true } });
+      noiseSuppression: false, autoGainControl: true } });
   } catch {
     heard.textContent = t.mic!;
     return;
@@ -210,18 +193,34 @@ async function start(): Promise<void> {
     $("go").hidden = false; $("skip").hidden = true;
   };
 
-  /* ScriptProcessor is deprecated in favour of AudioWorklet, but it works in
-     every browser a parent will hand a toddler, needs no extra file, and
-     4096 samples ≈ 85 ms of latency — irrelevant next to the recogniser's
-     endpointing. A worklet buys nothing here. */
-  const src = ctx.createMediaStreamSource(mic);
-  const node = ctx.createScriptProcessor(4096, 1, 1);
-  node.onaudioprocess = (e: AudioProcessingEvent) => {
-    if (!live || !ws || ws.readyState !== 1) return;
-    ws.send(pcm16(down(e.inputBuffer.getChannelData(0), ctx!.sampleRate)));
+  await startMic(mic);
+}
+
+/* The microphone runs in its OWN AudioContext, asked to run at 16 kHz so the
+ * browser resamples natively and mic-worklet.js can pass the samples through
+ * untouched. (Playback keeps the default context: a 16 kHz context would play
+ * the 24 kHz voice through a worse resampler.) If the browser refuses a
+ * 16 kHz context, or refuses to connect the mic to it, we fall back to the
+ * hardware rate and the worklet does the filtering and decimation itself —
+ * see mic-worklet.js for why neither path uses the main thread. */
+async function startMic(mic: MediaStream): Promise<void> {
+  let cap: AudioContext, src: MediaStreamAudioSourceNode;
+  try {
+    cap = new AudioContext({ sampleRate: IN });
+    src = cap.createMediaStreamSource(mic);
+  } catch {
+    cap = new AudioContext();
+    src = cap.createMediaStreamSource(mic);
+  }
+  await cap.resume();
+  await cap.audioWorklet.addModule("/mic-worklet.js");
+  const node = new AudioWorkletNode(cap, "mic", {
+    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+  node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+    if (live && ws && ws.readyState === 1) ws.send(e.data);   // 20 ms of PCM16
   };
   src.connect(node);
-  node.connect(ctx.destination);           // required for onaudioprocess to fire
+  node.connect(cap.destination);            // silent; some browsers only run connected nodes
 }
 
 $("go").onclick = () => { void start(); };

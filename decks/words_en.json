@@ -41,7 +41,8 @@
       "group": "hayvan",
       "also": [
         "gog",
-        "doggy"
+        "doggy",
+        "dawn"
       ],
       "cry": "woof woof"
     },
@@ -51,7 +52,9 @@
       "group": "hayvan",
       "also": [
         "hoss",
-        "horsey"
+        "horsey",
+        "force",
+        "hoarse"
       ],
       "cry": "neigh"
     },
@@ -60,7 +63,8 @@
       "emoji": "🐄",
       "group": "hayvan",
       "also": [
-        "cowie"
+        "cowie",
+        "cal"
       ],
       "cry": "moo moo"
     },
@@ -124,7 +128,9 @@
       "group": "hayvan",
       "also": [
         "guck",
-        "ducky"
+        "ducky",
+        "doc",
+        "dock"
       ],
       "cry": "quack quack"
     },
@@ -414,7 +420,9 @@
       "emoji": "🐝",
       "group": "hayvan",
       "also": [
-        "beee"
+        "beee",
+        "b",
+        "be"
       ],
       "cry": "buzz buzz"
     },
@@ -524,7 +532,9 @@
       "group": "eşya",
       "also": [
         "baw",
-        "ballie"
+        "ballie",
+        "paul",
+        "bowl"
       ]
     },
     {
@@ -549,7 +559,11 @@
       "emoji": "☀️",
       "group": "eşya",
       "also": [
-        "sunny"
+        "sunny",
+        "asan",
+        "essan",
+        "assign",
+        "assigned"
       ]
     },
     {

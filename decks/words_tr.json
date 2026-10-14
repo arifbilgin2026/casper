@@ -131,7 +131,9 @@
       "group": "hayvan",
       "also": [
         "kus",
-        "ku"
+        "ku",
+        "hoş",
+        "boş"
       ],
       "cry": "cik cik"
     },
@@ -276,7 +278,9 @@
       "group": "hayvan",
       "also": [
         "fiil",
-        "fi"
+        "fi",
+        "pin",
+        "bin"
       ],
       "cry": "törööö"
     },
@@ -673,7 +677,8 @@
       "group": "eşya",
       "also": [
         "eev",
-        "eve"
+        "eve",
+        "dev"
       ]
     },
     {

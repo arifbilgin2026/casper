@@ -15,13 +15,13 @@
 import { Brain } from "./llm.js";
 import { Chatter } from "./chatter.js";
 import { Ears } from "./ears.js";
-import { Mouth } from "./mouth.js";
+import { Mouth, Take } from "./mouth.js";
 import { CUES } from "./sounds.js";
 import {
   Card, Lang, SayStream, Step, firstClause, isNarration, parse, stateText,
   system, unwrap,
 } from "./persona.js";
-import { heardIt, norm } from "./match.js";
+import { heardIt, norm, saidExactly } from "./match.js";
 
 const TICK_MS = 200;          // how often we consider asking
 const MIN_QUIET_S = 0.45;     // she must have been quiet this long…
@@ -32,6 +32,11 @@ const FLUSH_NUDGE_S = 0.6;    // interim stuck this long → ask the ears to set
 const JUDGE_INTERIM_S = 1.2;  // still stuck → judge the grey text ourselves
 const FIRST_SOUND_S = 1.4;    // the model has this long to start a clause
 const ECHO_TAIL_MS = 350;     // the ears keep ignoring us this long after we stop
+const EARLY_STABLE_MS = 100;  // an exact-word interim unchanged this long is the answer
+const INSTANT_TRIES = 2;      // wrong answers up to here get a prepared line, no model wait
+const LOUD_MIN = 700;          // never call anything under this a voice
+const SPEAKING_HOLD_MS = 900; // don't start talking within this of her last sound
+const TRACE = process.env.STT_TRACE === "1";   // log transcripts + latency (off by default)
 
 export interface GameIO {
   sendJson(obj: unknown): void;
@@ -68,6 +73,9 @@ export class Game {
   private interimAt = 0;
   private nudged = false;
   private judged: [string, number] = ["", 0];
+  private earlyTimer: ReturnType<typeof setTimeout> | null = null;
+  private answerAt = 0;         // when the current answer was accepted (latency trace)
+  private answerVia = "final";
   private ticker: ReturnType<typeof setInterval> | null = null;
   private closed = false;
 
@@ -85,18 +93,64 @@ export class Game {
 
   async start(): Promise<void> {
     this.mouth = new Mouth((pcm) => this.io.sendPcm(pcm), this.voice, this.lang);
-    this.chatter = new Chatter(this.brain, this.lang, this.phrases);
-    this.ears = new Ears(this.lang,
-      (t) => this.onPartial(t), (t) => { void this.onFinal(t); });
+    // A card's "try again" line is fetched in voice the moment it is written:
+    // a wrong answer is the one reply with no chime to hide a synthesis behind.
+    this.chatter = new Chatter(this.brain, this.lang, this.phrases, (kind, text) => {
+      if (kind === "again") this.mouth.prepare(text);
+    });
+    this.ears = new Ears(this.lang, this.deck.map((w) => w.word),
+      (t) => this.onPartial(t), (t) => { void this.onFinal(t); },
+      (line) => this.io.log(`${line} (${this.sinceLoud()})`));
     await this.ears.start();
     this.io.sendJson({ type: "ready" });
     this.show(this.deck[0]!.word);            // a picture is up before we speak
     const cry = this.card?.cry;
     if (cry) void this.perform([{ kind: "say", val: cry + "!" }]);
     this.ticker = setInterval(() => { void this.tick(); }, TICK_MS);
+    // Fill the voice cache in the background: the canned lines first (every
+    // fallback uses them), then each animal's cry. Process-wide, so only the
+    // first family after a deploy ever pays for it.
+    void this.mouth.warm([
+      ...this.phrases.again, ...this.phrases.ask, ...this.phrases.yes,
+      ...this.deck.filter((w) => w.cry).map((w) => w.cry + "!"),
+    ]);
   }
 
-  feed(pcm: Buffer): void { this.ears.feed(pcm); }
+  private lastLoudAt = 0;       // when the audio last rose clearly above the room
+  private floor = 200;          // slowly tracked room-noise level (peak, of 32767)
+  private micBytes = 0;
+  private micPeak = 0;
+  private micAt = Date.now();
+
+  feed(pcm: Buffer): void {
+    this.ears.feed(pcm);
+    let chunkPeak = 0;
+    for (let i = 0; i + 1 < pcm.length; i += 2) {
+      const v = Math.abs(pcm.readInt16LE(i));
+      if (v > chunkPeak) chunkPeak = v;
+    }
+    // A cheap voice-activity signal straight from the audio, available ~500 ms
+    // before the recogniser reports anything. The room's noise floor is
+    // tracked slowly (it rises only a little per chunk, falls at once), and
+    // "loud" means clearly above it.
+    this.floor = chunkPeak < this.floor ? chunkPeak : this.floor + (chunkPeak - this.floor) * 0.002;
+    if (chunkPeak > Math.max(LOUD_MIN, this.floor * 4)) this.lastLoudAt = Date.now();
+    if (!TRACE) return;
+    this.micBytes += pcm.length;
+    if (chunkPeak > this.micPeak) this.micPeak = chunkPeak;
+    if (Date.now() - this.micAt >= 5000) {
+      this.io.log(`[mic] ${(this.micBytes / 1024).toFixed(0)} KB in 5 s `
+        + `(${(this.micBytes / 160000).toFixed(2)}x realtime), peak ${this.micPeak}/32767, `
+        + `floor ${Math.round(this.floor)}`);
+      this.micBytes = 0; this.micPeak = 0; this.micAt = Date.now();
+    }
+  }
+
+  /** Has the child made a sound in the last `ms`? Her answer may still be on
+   *  its way from the recogniser even though nothing has arrived yet. */
+  childLoudWithin(ms: number): boolean {
+    return Date.now() - this.lastLoudAt < ms;
+  }
 
   next(): void {                              // the skip button
     this.heard = "";
@@ -107,6 +161,7 @@ export class Game {
   close(): void {
     this.closed = true;
     if (this.ticker) clearInterval(this.ticker);
+    if (this.earlyTimer) clearTimeout(this.earlyTimer);
     this.ears.close();
     this.io.log(`game over: score ${this.score}, `
       + `lines ${this.chatter.usedLlm} written / ${this.chatter.usedCanned} canned`);
@@ -118,34 +173,60 @@ export class Game {
     return this.mouth.speaking || this.busy || Date.now() < this.muteUntil;
   }
 
-  /** Do one line, in the order it was written. */
+  /** Logged once per accepted answer: how long the child waited for a sound. */
+  private markFirstSound(): void {
+    if (!this.answerAt) return;
+    this.io.log(`[lat] answer → first sound ${Date.now() - this.answerAt} ms (${this.answerVia})`);
+    this.answerAt = 0;
+  }
+
+  /** Do one line, in the order it was written.
+   *
+   * Latency lives here. Before anything plays, EVERY synthesis the script
+   * will need is started — the praise, the next card's animal cry, the next
+   * question — so while the confetti chime is still sounding the voices are
+   * already arriving. Audio steps then just queue behind each other (the
+   * browser plays them gaplessly); only the VISUAL steps wait for the sound
+   * to catch up, because the picture should turn over at the point in the
+   * sentence where she expects it. */
   private async perform(script: Step[]): Promise<void> {
     const said = norm(script.filter((s) => s.kind === "say").map((s) => s.val).join(" "));
     this.busy = true;
     try {
-      for (const step of script) {
+      const takes = new Map<number, Take>();
+      script.forEach((s, i) => {
+        if (s.kind === "say") takes.set(i, this.mouth.prepare(s.val));
+        else if (s.kind === "card") {
+          const c = this.deck.find((w) => w.word.toLowerCase() === s.val.toLowerCase());
+          if (c?.cry) this.mouth.prepare(c.cry + "!");
+        }
+      });
+      const first = () => this.markFirstSound();
+      for (let i = 0; i < script.length; i++) {
+        const step = script[i]!;
         if (step.kind === "say") {
-          await this.mouth.say(step.val);
-          await this.mouth.waitQuiet();
+          await this.mouth.play(takes.get(i)!, first);
         } else if (step.kind === "sound" && CUES[step.val]) {
-          this.mouth.playPcm(CUES[step.val]!);
-          await this.mouth.waitQuiet();
+          this.mouth.playPcm(CUES[step.val]!, first);
         } else if (step.kind === "card") {
+          await this.mouth.waitQuiet();           // the picture turns where the sentence got to
           const before = this.card?.word;
           this.show(step.val);
           // The animal introduces itself the instant it appears — "hav hav
           // hav!" — from data, before any model word.
           const cry = this.card?.cry;
           if (this.card?.word !== before && cry) {
-            await this.mouth.say(cry + "!");
-            await this.mouth.waitQuiet();
+            await this.mouth.play(this.mouth.prepare(cry + "!"), first);
           }
         } else if (step.kind === "star") {
+          // A star with its chime fires with it; after words, when they land.
+          if (script[i - 1]?.kind !== "sound") await this.mouth.waitQuiet();
           this.score += 1;
           this.io.sendJson({ type: "score", score: this.score });
           if (this.card) this.io.onStar(this.card.word, this.score);
         }
       }
+      await this.mouth.waitQuiet();
       this.heard = "";
       this.interim = ""; this.nudged = false;   // our speech staled it
       if (said) { this.lastSpeech = said; this.lastCard = this.card?.word ?? null; }
@@ -188,16 +269,42 @@ export class Game {
 
   // ── ears in ────────────────────────────────────────────────────────────
 
+  /** Trace: how long ago the child's audio last rose above room noise. */
+  private sinceLoud(): string {
+    return this.lastLoudAt ? `${Date.now() - this.lastLoudAt} ms after loud audio` : "no loud audio";
+  }
+
   private onPartial(text: string): void {
     if (this.deaf() || !text.trim()) return;  // trap 2: never hear ourselves
     this.talking = true;
     this.lastVoice = Date.now();
-    if (text.trim() !== this.interim) {
-      this.interim = text.trim();
+    const t = text.trim();
+    if (t !== this.interim) {
+      this.interim = t;
       this.interimAt = this.lastVoice;
       this.nudged = false;
+      if (TRACE) this.io.log(`[stt] ~ "${t}" (${this.sinceLoud()})`);
     }
     this.io.sendJson({ type: "hearing", text });
+
+    // EARLY COMMIT. The recogniser knows what she said ~100 ms after the word
+    // ends, but only calls it final ~350 ms later (it is waiting out
+    // endpointing). When the interim is CERTAINLY the answer — an exact word
+    // that is not the start of a longer card word — and has not changed for
+    // EARLY_STABLE_MS, judge it now instead of making her wait.
+    if (this.earlyTimer) { clearTimeout(this.earlyTimer); this.earlyTimer = null; }
+    if (this.card && !this.verdict && !this.thinking
+        && saidExactly(t, this.card.word, this.card.also ?? [],
+                       this.deck.map((w) => w.word))) {
+      this.earlyTimer = setTimeout(() => {
+        this.earlyTimer = null;
+        if (this.interim !== t || this.deaf() || this.thinking) return; // she kept going
+        this.interim = ""; this.nudged = false;
+        this.answerVia = "early";
+        void this.onFinal(t);
+        this.judged = [norm(t), Date.now()];      // its real final is a duplicate
+      }, EARLY_STABLE_MS);
+    }
   }
 
   private async onFinal(text: string): Promise<void> {
@@ -206,6 +313,8 @@ export class Game {
     if (judgedText && norm(text) === judgedText && Date.now() - when < 2000) {
       return;        // the recogniser settled on what we already judged
     }
+    if (this.earlyTimer) { clearTimeout(this.earlyTimer); this.earlyTimer = null; }
+    if (this.answerVia !== "early") this.answerVia = "final";
     this.interim = ""; this.nudged = false;
     this.heard = text.trim();
     this.verdict = this.card
@@ -213,15 +322,24 @@ export class Game {
                 this.deck.map((w) => w.word))
       : null;
     this.talking = false;
-    this.lastVoice = Date.now();
+    this.lastVoice = this.answerAt = Date.now();
     this.tries += 1;
+    if (TRACE) this.io.log(`[stt] final "${this.heard}" → ${this.verdict} (${this.answerVia}, ${this.sinceLoud()})`);
     this.io.sendJson({ type: "said", text: this.heard, ok: this.verdict });
     if (this.verdict && !this.thinking) {
       // A right answer is rewarded NOW. No tick, no quiet gate, no model: the
       // reward is code's job, and a late one is what makes a child give up.
       this.thinking = true;
       void this.celebrate();
+    } else if (this.verdict === false && !this.thinking && this.tries <= INSTANT_TRIES) {
+      // A first miss gets a prepared line at once (the per-card "try again"
+      // was written in the background while she looked at the picture). The
+      // live persona, with its hints, takes over from the third try — it is
+      // worth a second's wait there, not on every slip of a toddler's tongue.
+      this.thinking = true;
+      void this.fallback().finally(() => { this.thinking = false; });
     }
+    this.answerVia = "final";
   }
 
   // ── the tick: the persona only ever acts into a silence ───────────────
@@ -251,10 +369,17 @@ export class Game {
     const sinceUs = this.lastUs ? (now - this.lastUs) / 1000 : 99;
     if (this.talking && quiet < MIN_QUIET_S) return;
     if (this.heard && quiet > 12) this.heard = "";  // too old to still be answering
-    const worth = this.heard || this.card === null || quiet >= NUDGE_AFTER_S;
+    // A nudge needs the whole room quiet: counting only HER silence made the
+    // game re-fire every tick after the first nudge and talk non-stop — deaf
+    // by its own design while it spoke, so the child could never get a word in.
+    const roomQuiet = Math.min(quiet, sinceUs);
+    const worth = this.heard || this.card === null || roomQuiet >= NUDGE_AFTER_S;
     // A settled answer already waited out endpointing; no second silence gate.
     const needQuiet = this.heard ? HEARD_QUIET_S : MIN_QUIET_S;
     if (!worth || quiet < needQuiet || sinceUs < MIN_SINCE_US_S) return;
+    // Never start talking over an answer that is still being recognised. The
+    // ears report ~450 ms after the word ends; her audio is visible at once.
+    if (!this.heard && this.childLoudWithin(SPEAKING_HOLD_MS)) return;
 
     this.thinking = true;
     try { await this.ask(quiet, sinceUs); }
@@ -289,9 +414,9 @@ export class Game {
       const word = this.card!.word;
       const next = this.unseen();
       const script: Step[] = [
-        { kind: "sound", val: "confetti" },
-        { kind: "say", val: this.chatter.line("yes", word) },
-        { kind: "star", val: "" },
+        { kind: "sound", val: "confetti" },   // the chime, the star and the on-screen
+        { kind: "star", val: "" },             // confetti are ONE moment: they fire together,
+        { kind: "say", val: this.chatter.line("yes", word) },   // …and only then the words
         { kind: "card", val: next },
         { kind: "say", val: this.chatter.line("ask", next) },
       ];
@@ -425,8 +550,7 @@ export class Game {
       // "Hop, at!" four times in a row teaches her to stop listening. Same
       // words, same card, nothing new from her: vary it ourselves.
       this.io.log(`[repeat dropped] ${line}`);
-      await this.fallback();
-      return;
+      return;                       // saying nothing is the right answer to silence
     }
     const saidSomething = !!this.heard;
     if (passed || !script.length) {

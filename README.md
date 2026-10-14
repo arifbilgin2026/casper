@@ -52,18 +52,80 @@ it matters as much as the code.
   no-repeat deck, animal cries announced from data at every card flip.
 - Degradation: with the model slow, down or disabled (`SOYLE_NO_LLM=1`) the
   game runs at full speed on prepared/canned lines.
-- 53 tests over the matcher, all three decks, the persona protocol and the
-  game guards: `npx vitest run` — no network or keys needed.
+- 66 tests over the matcher, all three decks, the persona protocol, the
+  game guards, the recogniser settings and the audio framing:
+  `npx vitest run` — no network or keys needed.
+- A measured listening pipeline (next section), checked by two scripted
+  children: `scripts/stt-bench.ts` and `scripts/browser-child.ts`.
 
 **Incomplete / honest caveats:**
-- The scripted-child acceptance harness (synthesised toddler answers played
-  at the game) is designed but not built; acceptance was checked by hand.
+- The scripted children use an adult synthetic voice. They rank settings
+  reliably, but a real toddler is quieter and less clear than any of them, so
+  absolute accuracy on a real child will be lower than the numbers below.
 - `lang` on the profile is set at signup; the in-game language switcher is
   just the `?lang=` query for now.
 - One Fargate task, no autoscaling — it is a family demo, not a product.
 - This project began as a Python prototype on an in-house voice library (it
   is in the git history); everything in HEAD is the TypeScript
   implementation, rebuilt for this submission.
+
+## Hearing a toddler (measured, not guessed)
+
+Short words from quiet children are the hard case for speech recognition, and
+the first version handled them badly. So the listening path was rebuilt from
+measurements. [scripts/stt-bench.ts](scripts/stt-bench.ts) synthesises the
+deck's short words, plays them at the recogniser in real time (room noise
+before and after, the microphone never stops) and scores each setting with the
+game's own matcher. At a quiet, toddler-like level (about -16 dB):
+
+| setting | words understood | final transcript arrives |
+|---|---|---|
+| nova-2, 250 ms endpoint (the first version) | 16 / 31 | 473 ms after the word ends |
+| nova-3 | 25 / 31 | 448 ms |
+| **nova-3 + the deck's words as keyterms** (now) | **27 / 31** | 455 ms |
+
+What changed because of it:
+- **Model and hints**: nova-3 with the ~66 deck words as keyterms
+  ([src/ears.ts](src/ears.ts)). Hints are model-specific (`keyterm` vs
+  `keywords`); the pairing is a tested guard because the wrong one is an HTTP
+  400 and a silently deaf game.
+- **Early commit**: the recogniser knows the word about 100 ms after it ends
+  but calls it final ~350 ms later. When an interim transcript is *certainly*
+  the answer (an exact word that is not the start of a longer card word:
+  `saidExactly` in [src/match.ts](src/match.ts)) and holds still for 100 ms,
+  it is judged at once. Measured end to end through a real browser:
+  **about 180 ms from the word ending to the celebration sound, versus about
+  440 ms waiting for the final.** When no interim arrives it falls back to the
+  final, so it can only be faster, never wrong.
+- **Words the recogniser mishears** (`kuş` heard as "Hoş", `bee` as "B") are
+  recorded as accepted alternates in the deck data, found by the bench.
+- **The microphone** runs on the audio thread
+  ([web/mic-worklet.js](web/mic-worklet.js)): 20 ms chunks, 16 kHz, a proper
+  anti-alias filter when the browser can't give 16 kHz natively, and browser
+  noise suppression *off* (it clips the onset of quiet one-syllable words).
+- **The game stops talking over her.** Two bugs found only by watching real
+  traces: a "still there?" nudge that re-fired every tick and kept the game
+  deaf most of the time, and a nudge that started 250 ms after she finished a
+  word, before the recogniser had reported it. The server now watches her
+  audio level directly and holds its tongue while she is speaking or has just
+  spoken.
+- **Replies don't wait for the voice**: a correct answer plays the chime
+  immediately while the praise, the animal's cry and the next question are
+  already being synthesised; a wrong answer gets a prepared line at once (a
+  process-wide audio cache means a canned line costs one synthesis per
+  deploy). Measured: a wrong answer gets its spoken reply within 1 ms when the
+  line is cached and within about 250 ms when it must be synthesised fresh.
+
+To see the numbers for yourself:
+
+```sh
+npx tsx scripts/stt-bench.ts --gain 0.15        # settings compared, quiet voice
+npx tsx scripts/browser-child.ts --lang tr --word kedi   # real Chrome, real worklet
+```
+
+Both need the two speech keys; set `STT_TRACE=1` on the server to log each
+transcript with its lag after the word ended (off by default: they are a
+child's words).
 
 ## Run it locally
 

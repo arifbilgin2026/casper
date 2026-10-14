@@ -38,6 +38,30 @@ function distance(a: string, b: string): number {
 }
 
 /**
+ * True only when `said` CERTAINLY contains the target word: an exact word (or
+ * a listed alternate) that is not also the start of some longer card word.
+ *
+ * This is the early-commit test — it runs on interim (still-changing)
+ * transcripts, so it must never fire on something the child is still in the
+ * middle of saying. "ay" (moon) is a prefix of "ayı" (bear): an interim "ay"
+ * is NOT certain, the next interim may be "ayı", so it waits for the final.
+ * heardIt() stays the generous judge for finals; this is the strict one.
+ */
+export function saidExactly(
+  said: string, target: string, also: string[] = [], others: string[] = [],
+): boolean {
+  const t = norm(target);
+  const alts = new Set(also.map(norm));
+  const rivals = others.map(norm).filter((o) => o !== t);
+  for (const word of norm(said).split(/\s+/)) {
+    if (!word || (word !== t && !alts.has(word))) continue;
+    if (rivals.some((r) => r !== word && r.startsWith(word))) continue;
+    return true;
+  }
+  return false;
+}
+
+/**
  * True if `said` is a fair attempt at `target`.
  *
  * `others` is every OTHER word in the deck. Being generous about near misses

@@ -47,12 +47,15 @@ export class Chatter {
   usedLlm = 0;
   usedCanned = 0;
   private ready = new Map<string, string>();
+  private used = new Set<string>();
   private pending = new Set<string>();
 
   constructor(
     private brain: Brain | null,
     private lang: Lang,
     private canned: Record<Kind, string[]>,
+    /** Called when a prepared line lands, so the voice can be fetched too. */
+    private onReady: (kind: Kind, text: string) => void = () => {},
   ) {}
 
   /** Start writing this card's three lines. Fire and forget. */
@@ -68,8 +71,12 @@ export class Chatter {
 
   /** The line to say RIGHT NOW. Prepared if ready, canned if not. */
   line(kind: Kind, word: string): string {
-    const got = this.ready.get(`${kind}:${word}`);
-    if (got) { this.usedLlm++; return got; }
+    const key = `${kind}:${word}`;
+    const got = this.ready.get(key);
+    // A prepared line is said once; the second time (a second miss on the
+    // same card) the canned pool varies it, so she never hears one sentence
+    // twice in a row.
+    if (got && !this.used.has(key)) { this.used.add(key); this.usedLlm++; return got; }
     this.usedCanned++;
     const pool = this.canned[kind];
     return pool[Math.floor(Math.random() * pool.length)] ?? "";
@@ -91,6 +98,9 @@ export class Chatter {
     if ((kind === "ask" || kind === "again")
         && line.toLowerCase().includes(word.toLowerCase())) return;
     if (isNarration(line)) return;
-    if (line.length > 0 && line.length <= 120) this.ready.set(key, line);
+    if (line.length > 0 && line.length <= 120) {
+      this.ready.set(key, line);
+      this.onReady(kind, line);
+    }
   }
 }

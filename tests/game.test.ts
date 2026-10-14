@@ -3,7 +3,7 @@
  * correct answer — so it is computed, never prompted. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Chatter } from "../src/chatter.js";
 import { Game, GameIO } from "../src/game.js";
 import type { Card } from "../src/persona.js";
@@ -74,5 +74,43 @@ describe("the code-owned turn", () => {
     show.call(game, "köpek");
     show.call(game, "kedi");
     expect((game as { card: Card | null }).card?.word).not.toBe("kedi");
+  });
+});
+
+describe("hearing her before the recogniser does", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  function listening() {
+    vi.useFakeTimers();
+    const { game, real } = playable();
+    (game as { ears: unknown }).ears = { feed() {}, finalize() {}, close() {} };
+    const chunk = (peak: number) => {
+      const b = Buffer.alloc(640);
+      for (let i = 0; i < 320; i++) b.writeInt16LE(i % 2 ? peak : -peak, i * 2);
+      return b;
+    };
+    // one 20 ms chunk of microphone audio, on the clock the server would see
+    const hear = (peak: number, n = 1) => {
+      for (let i = 0; i < n; i++) { real.feed(chunk(peak)); vi.advanceTimersByTime(20); }
+    };
+    return { real, hear };
+  }
+
+  it("room noise is not a voice; a clear sound is, for a while", () => {
+    const { real, hear } = listening();
+    hear(130, 50);                                    // quiet room
+    expect(real.childLoudWithin(900)).toBe(false);
+    hear(2800);                                       // "kedi"
+    expect(real.childLoudWithin(900)).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(real.childLoudWithin(900)).toBe(false);    // …and only for a while
+  });
+
+  it("a noisy room raises the bar instead of reading as constant speech", () => {
+    const { real, hear } = listening();
+    hear(900, 400);                                   // 8 s of fan / TV hum
+    expect(real.childLoudWithin(900)).toBe(false);
+    hear(6000);                                       // but a real voice over it still counts
+    expect(real.childLoudWithin(900)).toBe(true);
   });
 });

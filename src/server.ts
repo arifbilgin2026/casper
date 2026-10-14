@@ -89,10 +89,11 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/game" && req.method === "GET") {
       return await me(req) ? page(res, "game.html") : redirect(res, "/");
     }
-    if (url.pathname === "/app.js" && req.method === "GET") {
+    if ((url.pathname === "/app.js" || url.pathname === "/mic-worklet.js")
+        && req.method === "GET") {
       res.writeHead(200, { "content-type": "application/javascript; charset=utf-8",
                            "cache-control": "no-store" });
-      res.end(readFileSync(path.join(HERE, "..", "web", "app.js")));
+      res.end(readFileSync(path.join(HERE, "..", "web", url.pathname.slice(1))));
       return;
     }
 

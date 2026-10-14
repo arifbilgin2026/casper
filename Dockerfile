@@ -16,6 +16,7 @@ COPY --from=build /app/dist dist
 COPY --from=build /app/web/login.html web/login.html
 COPY --from=build /app/web/game.html web/game.html
 COPY --from=build /app/web/app.js web/app.js
+COPY --from=build /app/web/mic-worklet.js web/mic-worklet.js
 COPY decks decks
 ENV PORT=8080
 EXPOSE 8080

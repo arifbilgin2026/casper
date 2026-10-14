@@ -45,7 +45,9 @@
   .skip{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
         background:transparent;color:var(--dim);font-size:15px;padding:10px 14px}
   .bye{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
-  .bye button{background:transparent;color:var(--dim);font-size:15px;padding:10px 14px}
+  .bye button{background:transparent;font-size:22px;padding:10px 14px;
+              filter:grayscale(.4);opacity:.75}
+  .bye button:hover{filter:none;opacity:1}
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
@@ -57,7 +59,7 @@
   <div class="heard" id="heard">söyle</div>
   <button id="go"><span id="golabel">Başla</span></button>
   <button class="skip" id="skip" hidden>başka →</button>
-  <form class="bye" method="post" action="/logout"><button>×</button></form>
+  <form class="bye" method="post" action="/logout"><button title="log out" aria-label="log out">🚪</button></form>
 
 <script src="app.js"></script>
 </body>

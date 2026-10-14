@@ -49,10 +49,31 @@ export class Mouth {
       console.log(`[mouth] tts ${res.status}: ${(await res.text()).slice(0, 120)}`);
       return;
     }
+    // The HTTP stream splits on arbitrary BYTE boundaries, but a PCM16 sample
+    // is two bytes: forward an odd-length chunk and the browser decodes
+    // everything after the split one byte off — a word turns to static
+    // mid-syllable. Carry the remainder, emit only sample-aligned frames,
+    // and batch to ≥50 ms so the browser isn't scheduling confetti-sized
+    // buffers either.
+    const MIN = 2400;                         // bytes: 50 ms of 24 kHz PCM16
+    let pending = Buffer.alloc(0);
     for await (const chunk of res.body) {
-      const buf = Buffer.from(chunk);
-      this.account(buf.length);
-      this.send(buf);
+      pending = pending.length
+        ? Buffer.concat([pending, Buffer.from(chunk)])
+        : Buffer.from(chunk);
+      const aligned = pending.length - (pending.length % 2);
+      if (aligned >= MIN) {
+        const out = pending.subarray(0, aligned);
+        pending = Buffer.from(pending.subarray(aligned));
+        this.account(out.length);
+        this.send(out);
+      }
+    }
+    if (pending.length) {                     // the tail, padded to a sample
+      const tail = pending.length % 2
+        ? Buffer.concat([pending, Buffer.from([0])]) : pending;
+      this.account(tail.length);
+      this.send(tail);
     }
   }
 

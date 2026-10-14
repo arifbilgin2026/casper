@@ -44,18 +44,46 @@ const VOICES: Record<Lang, string> = {
 const deck = (l: Lang) => (JSON.parse(readFileSync(
   path.join(HERE, "..", "decks", `words_${l}.json`), "utf8")) as { words: Card[] }).words;
 
-// The short, confusable words — the ones a toddler is actually asked.
-const TESTS: Record<Lang, string[]> = {
-  tr: ["at", "ay", "fil", "muz", "kedi", "ev", "top", "süt", "deve", "kuş", "inek", "balık"],
-  ru: ["дом", "кит", "лев", "сыр", "мяч", "лиса", "слон", "утка", "кот"].filter(Boolean),
-  en: ["cat", "dog", "cow", "pig", "bee", "car", "sun", "ball", "duck", "horse", "bear"],
+// What is spoken, and the card it is MEANT for. The normal set is the short,
+// confusable real words; --set baby speaks the simplified forms a toddler
+// produces (r→w, k→t, final consonant dropped…) to see what the recogniser
+// makes of non-words.
+interface Case { say: string; card: string }
+const same = (...w: string[]): Case[] => w.map((x) => ({ say: x, card: x }));
+const SETS: Record<string, Record<Lang, Case[]>> = {
+  real: {
+    tr: same("at", "ay", "fil", "muz", "kedi", "ev", "top", "süt", "deve", "kuş", "inek", "balık"),
+    ru: same("дом", "кит", "лев", "сыр", "мяч", "лиса", "слон", "утка"),
+    en: same("cat", "dog", "cow", "pig", "bee", "car", "sun", "ball", "duck", "horse", "bear"),
+  },
+  baby: {
+    tr: [["tedi", "kedi"], ["pil", "fil"], ["balı", "balık"], ["köpe", "köpek"], ["ema", "elma"],
+         ["aba", "araba"], ["kuş", "kuş"], ["tavşa", "tavşan"], ["uçak", "uçak"]]
+        .map(([say, card]) => ({ say: say!, card: card! })),
+    ru: [["кока", "кошка"], ["бака", "собака"], ["лоша", "лошадь"], ["мако", "молоко"],
+         ["тица", "птица"], ["мяч", "мяч"], ["ябоко", "яблоко"]]
+        .map(([say, card]) => ({ say: say!, card: card! })),
+    en: [["tat", "cat"], ["dod", "dog"], ["fwog", "frog"], ["wabbit", "rabbit"], ["baw", "ball"],
+         ["bea", "bear"], ["nana", "banana"], ["hoss", "horse"], ["guck", "duck"]]
+        .map(([say, card]) => ({ say: say!, card: card! })),
+  },
 };
+const babble = (card: string): Case[] =>
+  ["ba ba ba", "da da", "mmm", "aaah", "uh oh", "ma ma", "gagaga", "brrr", "eee", "ooh"]
+    .map((say) => ({ say, card }));
+SETS.babble = { tr: babble("kedi"), ru: babble("кошка"), en: babble("cat") };
+const SET = SETS[arg("set", "real")]!;
+const TOL = arg("tol", "off") as "off" | "normal" | "high";
 
 interface Variant {
   name: string; model: string; endpointing: number;
   keyterms?: boolean; keywords?: boolean; extra?: string;
 }
 const ALL_VARIANTS: Variant[] = [
+  { name: "P nova-3 ep180 +keyterms (now)", model: "nova-3", endpointing: 180, keyterms: true },
+  { name: "H nova-3 ep180 +keyterms +filler_words", model: "nova-3", endpointing: 180, keyterms: true, extra: "&filler_words=true" },
+  { name: "F  … +alternatives=3 (any matches)", model: "nova-3", endpointing: 180, keyterms: true, extra: "&alternatives=3" },
+  { name: "G  … +alternatives +filler_words", model: "nova-3", endpointing: 180, keyterms: true, extra: "&alternatives=3&filler_words=true" },
   { name: "A nova-2 ep250 (current)", model: "nova-2", endpointing: 250 },
   { name: "B nova-3 ep250", model: "nova-3", endpointing: 250 },
   { name: "C nova-3 ep250 +keyterms", model: "nova-3", endpointing: 250, keyterms: true },
@@ -123,6 +151,7 @@ function url(v: Variant, lang: Lang): string {
     + `&endpointing=${v.endpointing}&punctuate=true`;
   const words = deck(lang).map((w) => w.word);
   if (v.keyterms) u += words.map((w) => `&keyterm=${encodeURIComponent(w)}`).join("");
+  if (v.extra) u += v.extra;
   if (v.keywords) u += words.map((w) => `&keywords=${encodeURIComponent(w)}:2`).join("");
   return u;
 }
@@ -130,6 +159,7 @@ function url(v: Variant, lang: Lang): string {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 
 async function run(v: Variant, lang: Lang, card: Card, word: Buffer): Promise<Result> {
+  let altOk = false;
   const all = deck(lang).map((w) => w.word);
   const [, wordEnd] = speechSpan(word);
   const { pcm, leadMs } = scene(word);
@@ -145,7 +175,12 @@ async function run(v: Variant, lang: Lang, card: Card, word: Buffer): Promise<Re
     const text: string = m.channel?.alternatives?.[0]?.transcript ?? "";
     if (!text.trim()) return;
     const lag = Date.now() - t0 - endAt;
-    const good = heardIt(text, card.word, card.also ?? [], all);
+    if (m.is_final && v.extra?.includes("alternatives")) {
+      for (const a of (m.channel?.alternatives ?? []) as { transcript?: string }[]) {
+        if (a.transcript && heardIt(a.transcript, card.word, card.also ?? [], all, TOL)) altOk = true;
+      }
+    }
+    const good = heardIt(text, card.word, card.also ?? [], all, TOL);
     if (good && interimLag === null) interimLag = lag;
     if (m.is_final) {
       finals += (finals ? " " : "") + text;
@@ -162,7 +197,7 @@ async function run(v: Variant, lang: Lang, card: Card, word: Buffer): Promise<Re
   ws.send(JSON.stringify({ type: "CloseStream" }));
   await sleep(500);
   ws.close();
-  return { heard: finals, ok: heardIt(finals, card.word, card.also ?? [], all), interimLag, finalLag };
+  return { heard: finals, ok: altOk || heardIt(finals, card.word, card.also ?? [], all, TOL), interimLag, finalLag };
 }
 
 // ── report ───────────────────────────────────────────────────────────────
@@ -174,25 +209,25 @@ for (const v of VARIANTS) rows.set(v.name, { ok: 0, n: 0, il: [], fl: [], miss: 
 for (const lang of ["tr", "ru", "en"] as Lang[]) {
   if (ONLY && ONLY !== lang) continue;
   const cards = deck(lang);
-  for (const w of TESTS[lang]) {
-    const card = cards.find((c) => c.word === w);
-    if (!card) { console.log(`(skip: ${w} not in ${lang} deck)`); continue; }
-    const pcm = await synth(lang, w);
+  for (const c of SET[lang]) {
+    const card = cards.find((x) => x.word === c.card);
+    if (!card) { console.log(`(skip: ${c.card} not in ${lang} deck)`); continue; }
+    const pcm = await synth(lang, c.say);
     const results = await Promise.all(VARIANTS.map((v) => run(v, lang, card, pcm)));
     VARIANTS.forEach((v, i) => {
       const r = results[i]!, row = rows.get(v.name)!;
       row.n++;
-      if (r.ok) row.ok++; else row.miss.push(`${lang}:${w}→"${r.heard}"${r.err ? " " + r.err : ""}`);
+      if (r.ok) row.ok++; else row.miss.push(`${lang}:${c.say}→${c.card} heard "${r.heard}"${r.err ? " " + r.err : ""}`);
       if (r.ok && r.interimLag !== null) row.il.push(r.interimLag);
       if (r.ok && r.finalLag !== null) row.fl.push(r.finalLag);
       if (r.ok && r.interimLag !== null && r.finalLag !== null && r.finalLag - r.interimLag > 80) row.early++;
     });
-    console.log(`${lang} ${w.padEnd(8)} ` + results.map((r) =>
+    console.log(`${lang} ${c.say.padEnd(8)}→ ${c.card.padEnd(8)} ` + results.map((r) =>
       (r.ok ? "✓" : "✗") + (r.finalLag !== null ? `${r.finalLag}`.padStart(5) : "   --")).join("  "));
   }
 }
 
-console.log(`\nchunk ${CHUNK_MS} ms, gain ${GAIN}   accuracy | median ms after word ends: first correct interim / first final`);
+console.log(`\nset ${arg("set", "real")}, tolerance ${TOL}, chunk ${CHUNK_MS} ms, gain ${GAIN}   accuracy | median ms after word ends: first correct interim / first final`);
 for (const [name, r] of rows) {
   console.log(`${name.padEnd(30)} ${r.ok}/${r.n}   interim ${String(med(r.il)).padStart(5)}   final ${String(med(r.fl)).padStart(5)}   interim-before-final in ${r.early}/${r.ok}`);
 }

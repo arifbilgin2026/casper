@@ -84,6 +84,7 @@ describe("hearing her before the recogniser does", () => {
     vi.useFakeTimers();
     const { game, real } = playable();
     (game as { ears: unknown }).ears = { feed() {}, finalize() {}, close() {} };
+    (game as { mouth: unknown }).mouth = { speaking: false };
     const chunk = (peak: number) => {
       const b = Buffer.alloc(640);
       for (let i = 0; i < 320; i++) b.writeInt16LE(i % 2 ? peak : -peak, i * 2);
@@ -112,5 +113,98 @@ describe("hearing her before the recogniser does", () => {
     expect(real.childLoudWithin(900)).toBe(false);
     hear(6000);                                       // but a real voice over it still counts
     expect(real.childLoudWithin(900)).toBe(true);
+  });
+});
+
+
+describe("a sound the recogniser never turned into a word", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  interface Step { kind: string; val: string }
+
+  function room(ageBand: "baby" | "toddler") {
+    vi.useFakeTimers();
+    const sent: unknown[] = [];
+    const io: GameIO = { sendJson: (o) => sent.push(o), sendPcm: () => {}, onStar: () => {}, log: () => {} };
+    const real = new Game("tr", deckFile.words, deckFile.phrases, "v", io, { noLlm: true, ageBand });
+    const g = real as unknown as Record<string, unknown>;
+    const performed: Step[][] = [];
+    const mouth = { speaking: false };
+    g.ears = { feed() {}, finalize() {}, close() {} };
+    g.mouth = mouth;
+    g.chatter = new Chatter(null, "tr", deckFile.phrases);
+    g.perform = async (script: Step[]) => { performed.push(script); };
+    g.card = deckFile.words[0];                       // "kedi"
+    g.seen = new Set([deckFile.words[0]!.word]);
+    const chunk = (peak: number) => {
+      const b = Buffer.alloc(640);
+      for (let i = 0; i < 320; i++) b.writeInt16LE(i % 2 ? peak : -peak, i * 2);
+      return b;
+    };
+    const hear = (peak: number, ms: number) => {
+      for (let t = 0; t < ms; t += 20) { real.feed(chunk(peak)); vi.advanceTimersByTime(20); }
+    };
+    const tick = async () => { await (g.tick as () => Promise<void>).call(g); await vi.advanceTimersByTimeAsync(10); };
+    return { real, g, performed, mouth, hear, tick, sent };
+  }
+
+  it("toddler: a sound with no words is met with an instant encouragement, not silence", async () => {
+    const { performed, sent, hear, tick } = room("toddler");
+    hear(130, 600); hear(2800, 400); hear(130, 1300);        // a babble, then quiet
+    await tick();
+    expect(sent).toContainEqual(expect.objectContaining({ type: "said", text: "…" }));
+    expect(performed.length).toBe(1);
+    const says = performed[0]!.filter((s) => s.kind === "say").map((s) => s.val);
+    expect(deckFile.phrases.again).toContain(says[0]);
+  });
+
+  it("toddler: the third unheard try simply tells her the word and moves on", async () => {
+    const { g, performed, hear, tick } = room("toddler");
+    g.tries = 2;                                              // this will be the third
+    hear(130, 600); hear(2800, 400); hear(130, 1300);
+    await tick();
+    const steps = performed[0]!;
+    expect(steps[0]).toEqual({ kind: "say", val: "kedi!" });
+    expect(steps.some((s) => s.kind === "card")).toBe(true);
+    expect(steps.some((s) => s.kind === "star")).toBe(false); // told, not earned
+  });
+
+  it("baby: the same babble is a WIN — chime, star, and the word said for her", async () => {
+    const { performed, hear, tick } = room("baby");
+    hear(130, 600); hear(2800, 400); hear(130, 1300);
+    await tick();
+    const kinds = performed[0]!.map((s) => s.kind);
+    expect(kinds).toContain("sound");
+    expect(kinds).toContain("star");
+    expect(performed[0]!.some((s) => s.kind === "say" && s.val === "kedi!")).toBe(true);
+    expect(kinds).toContain("card");
+  });
+
+  it("a click or a cough is not an attempt", async () => {
+    const { performed, hear, tick } = room("baby");
+    hear(130, 600); hear(2800, 100); hear(130, 1500);
+    await tick();
+    expect(performed.length).toBe(0);
+  });
+
+  it("a sound the recogniser DID turn into text is handled as an answer, not as unheard", async () => {
+    const { g, sent, hear, tick } = room("toddler");
+    hear(130, 600); hear(2800, 400);
+    (g.onPartial as (t: string) => void).call(g, "mama");      // it heard *something*
+    hear(130, 1300);
+    await tick();
+    // Whatever the game does with "mama" (it judges the stuck interim as a
+    // wrong answer), it is not the *unheard* path — only that one reports "…".
+    expect(sent).not.toContainEqual(expect.objectContaining({ type: "said", text: "…" }));
+  });
+
+  it("the game's own voice is never mistaken for her", async () => {
+    const { mouth, performed, hear, tick } = room("baby");
+    mouth.speaking = true;                                     // we are talking
+    hear(2800, 600);                                           // echo of our own speech
+    mouth.speaking = false;
+    hear(130, 1500);
+    await tick();
+    expect(performed.length).toBe(0);
   });
 });

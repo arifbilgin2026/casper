@@ -7,6 +7,8 @@
  * word has a correct answer; a model is the wrong tool for it.
  */
 
+import { Tolerance, allowance, skeleton, soundDistance } from "./phonetic.js";
+
 const FOLD: Record<string, string> = {
   "â": "a", "î": "i", "û": "u", "ä": "a", "ë": "e", "ï": "i", "ö": "o",
   "ü": "u", "Â": "A", "Î": "I", "Û": "U",
@@ -73,9 +75,16 @@ export function saidExactly(
  */
 export function heardIt(
   said: string, target: string, also: string[] = [], others: string[] = [],
+  tolerance: Tolerance = "off",
 ): boolean {
   const s = norm(said), t = norm(target);
   if (!s) return false;
+  if (spelledAttempt(s, t, also, others)) return true;
+  return tolerance !== "off" && soundsLike(s, t, others, tolerance);
+}
+
+/** The spelling-level judge: exact, listed alternates, prefixes, near misses. */
+function spelledAttempt(s: string, t: string, also: string[], others: string[]): boolean {
   const alts = new Set(also.map(norm));
   if (alts.has(s)) return true;              // a two-word attempt, e.g. "köpek balığı"
   const rivals = others.map(norm).filter((o) => o !== t);
@@ -96,6 +105,34 @@ export function heardIt(
     if (d > Math.max(1, Math.floor(t.length / 3))) continue;
     if (rivals.some((r) => distance(word, r) <= d)) continue;
     return true;
+  }
+  return false;
+}
+
+/**
+ * The sound-level judge, the last resort for a baby's simplifications.
+ *
+ * Still "forgiving about pronunciation, strict about identity", on sound:
+ *  - a word that IS another card's exact word is that card, never this one;
+ *  - the target must sit within the tolerance's allowance of the sounds said;
+ *  - and no other card may sit strictly closer (at "normal" it must also not
+ *    tie — a coin-flip between two cards earns neither; at "high" a tie goes
+ *    to the card on screen, since a baby who is trying should not be punished
+ *    for a sound that fits two pictures).
+ */
+function soundsLike(s: string, t: string, others: string[], tol: Tolerance): boolean {
+  const target = skeleton(t);
+  if (target.length < 2) return false;
+  const rivals = others.map(norm).filter((o) => o !== t);
+  const allowed = allowance(target.length, tol);
+  for (const word of s.split(/\s+/)) {
+    if (rivals.includes(word)) continue;            // she named a different card
+    const heard = skeleton(word);
+    if (heard.length < 2 && !(heard.length === 1 && target.length <= 2)) continue;
+    const d = soundDistance(heard, target);
+    if (d > allowed) continue;
+    const best = Math.min(...rivals.map((r) => soundDistance(heard, skeleton(r))), Infinity);
+    if (tol === "high" ? d <= best : d < best) return true;
   }
   return false;
 }

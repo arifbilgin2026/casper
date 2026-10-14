@@ -26,6 +26,7 @@ const arg = (n: string, d: string) => {
 };
 const LANG = arg("lang", "tr"), WORD = arg("word", "kedi");
 const GAIN = Number(arg("gain", "0.3")), SECS = Number(arg("secs", "45"));
+const MODE = arg("mode", "");                       // baby | toddler (blank = the family default)
 const PORT = 8611, CDP = 9333, PERIOD_S = 9;
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const VOICES: Record<string, string> = {
@@ -95,12 +96,16 @@ const log: string[] = [];
 const server = spawn("npx", ["tsx", "src/server.ts"], {
   cwd: path.join(HERE, ".."),
   env: { ...process.env, PORT: String(PORT), SOYLE_NO_LLM: "1", STT_TRACE: "1" },
+  detached: true,                     // its own process group, so cleanup can take the grandchildren too
 });
 for (const s of [server.stdout, server.stderr]) {
   s.on("data", (d) => String(d).split("\n").filter(Boolean).forEach((l) => log.push(`${Date.now()} ${l}`)));
 }
 let chrome: ReturnType<typeof spawn> | null = null;
-const cleanup = () => { chrome?.kill("SIGKILL"); server.kill("SIGKILL"); };
+const killGroup = (c: { pid?: number } | null) => {
+  if (c?.pid) { try { process.kill(-c.pid, "SIGKILL"); } catch { try { process.kill(c.pid, "SIGKILL"); } catch { /* gone */ } } }
+};
+const cleanup = () => { killGroup(chrome); killGroup(server); };
 process.on("SIGINT", () => { cleanup(); process.exit(1); });
 
 try {
@@ -112,7 +117,7 @@ try {
   const su = await fetch(`http://localhost:${PORT}/signup`, {
     method: "POST", redirect: "manual",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ email: "child@test.dev", password: "secret1", childName: "T", lang: LANG }),
+    body: new URLSearchParams({ email: "child@test.dev", password: "secret1", confirm: "secret1", childName: "T", lang: LANG }),
   });
   const sid = (su.headers.get("set-cookie") ?? "").match(/sid=([^;]+)/)?.[1];
   if (!sid) throw new Error("signup failed");
@@ -122,7 +127,7 @@ try {
     "--headless=new", `--remote-debugging-port=${CDP}`, "--mute-audio",
     "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required",
     "--user-data-dir=/tmp/soyle-chrome-profile", "--no-first-run", "about:blank",
-  ], { stdio: "ignore" });
+  ], { stdio: "ignore", detached: true });
   let target = "";
   for (let i = 0; i < 40 && !target; i++) {
     await sleep(250);
@@ -157,7 +162,7 @@ try {
   await call("Network.setCookie", { name: "sid", value: sid, url: `http://localhost:${PORT}/` });
   await call("Page.enable");
   await call("Page.addScriptToEvaluateOnNewDocument", { source: micOverride(raw) });
-  await call("Page.navigate", { url: `http://localhost:${PORT}/game` });
+  await call("Page.navigate", { url: `http://localhost:${PORT}/game${MODE ? "?mode=" + MODE : ""}` });
   await sleep(2000);
   await call("Runtime.evaluate", { expression: "document.getElementById('go').click()", userGesture: true });
   console.log(`playing "${WORD}" (${LANG}) at gain ${GAIN} through headless Chrome for ${SECS}s…`);
@@ -181,7 +186,7 @@ try {
   cleanup();
 }
 
-const keep = log.filter((l) => /\[(stt|dg|lat|celebrate|fallback|mic|browser error)\]|session start failed|error/i.test(l));
+const keep = log.filter((l) => /\[(stt|dg|lat|celebrate|fallback|browser error)\]|said|session start failed|error/i.test(l));
 const t0 = Number(keep[0]?.split(" ")[0] ?? 0);
 console.log("\n   t(s)  event");
 for (const l of keep) {
@@ -191,3 +196,5 @@ for (const l of keep) {
 const lat = keep.map((l) => l.match(/first sound (\d+) ms/)?.[1]).filter(Boolean).map(Number);
 console.log(`\nanswers heard: ${keep.filter((l) => /\[stt\] final/.test(l)).length}   `
   + `answer → first sound ms: ${lat.join(", ") || "none"}`);
+
+process.exit(0);

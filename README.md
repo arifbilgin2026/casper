@@ -40,8 +40,10 @@ it matters as much as the code.
 ## Status note (what works / what's incomplete / how to run)
 
 **Works, verified on the hosted link:**
-- Parent signup/login (scrypt + HMAC-signed session cookie); the game socket
-  is refused without a session. Stars and mastered words persist per family
+- Parent accounts (scrypt + HMAC-signed session cookie): a script-free sign-in
+  page, a separate create-account page with confirm password and a
+  "how old is your child?" setting; the game socket is refused without a
+  session. Stars and mastered words persist per family
   in DynamoDB across visits.
 - The full voice loop in three languages: live STT (Deepgram), a persona
   (Claude Haiku on Bedrock) answering in a `{"think","say"}` envelope, and
@@ -52,7 +54,7 @@ it matters as much as the code.
   no-repeat deck, animal cries announced from data at every card flip.
 - Degradation: with the model slow, down or disabled (`SOYLE_NO_LLM=1`) the
   game runs at full speed on prepared/canned lines.
-- 66 tests over the matcher, all three decks, the persona protocol, the
+- 90 tests over the matcher, the sound-tolerance layer, all three decks, the persona protocol, the
   game guards, the recogniser settings and the audio framing:
   `npx vitest run` — no network or keys needed.
 - A measured listening pipeline (next section), checked by two scripted
@@ -126,6 +128,40 @@ npx tsx scripts/browser-child.ts --lang tr --word kedi   # real Chrome, real wor
 Both need the two speech keys; set `STT_TRACE=1` on the server to log each
 transcript with its lag after the word ended (off by default: they are a
 child's words).
+
+## Forgiving a baby (and what to do when the recogniser hears nothing)
+
+A 1-2 year old does not say words, she says *sounds* — and a recogniser is
+built to hear words. Measured with the bench (synthetic voice, so the pattern
+matters more than the exact figures):
+
+- Pure babble ("mmm", "eee", "brrr", "ba ba") comes back **blank about 40% of
+  the time**, and as a confident *wrong guess* ("Mama", "Gagaga", "A") the rest.
+- Deepgram's n-best `alternatives` are not available on live audio (the socket
+  returns nothing), and `filler_words` changes nothing. Both were tried and
+  dropped.
+
+So the game does not rely on the recogniser alone:
+
+- **Tolerance on sound, not spelling** ([src/phonetic.ts](src/phonetic.ts)).
+  Children simplify words systematically (r→w "wabbit", k→t "tat", a dropped
+  final consonant "ca", a collapsed cluster "fwog", a dropped first syllable
+  "nana"). Both sides are reduced to a coarse sound skeleton and compared
+  there. On baby-style forms this credits 14/25 with it off, 15/25 at the
+  default and 19/25 for babies. The identity rule is unchanged: a word that
+  is another card's exact word is never credited to this one, and a test
+  proves that for every card in every language at every tolerance level.
+- **A sound is an attempt even when it is not a word.** The server watches the
+  audio level ([src/game.ts](src/game.ts)): a stretch of her voice that the
+  recogniser never turned into text is an *unheard attempt*, and a child who
+  is ignored stops trying. Toddlers get an instant "try again" (and on the
+  third try are simply told the word); the game's own voice is never mistaken
+  for hers.
+- **Baby mode** (chosen at signup, or `?mode=baby` on the game URL) makes
+  every attempt a win: a match, a wrong guess, or a gurgle all get the chime,
+  a star and the word said for her ("cat!"), then the next picture. The code
+  still knows whether she actually said it; it just doesn't say no to a baby.
+  Be aware that this rewards *any* vocalisation, a parent's included.
 
 ## Run it locally
 

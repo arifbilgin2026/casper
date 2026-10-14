@@ -38,6 +38,7 @@ type Lang = "tr" | "ru" | "en";
 interface Me { email: string; childName: string; lang: Lang; stars: number; mastered: number }
 
 const qlang = new URLSearchParams(location.search).get("lang") as Lang | null;
+const qmode = new URLSearchParams(location.search).get("mode");   // baby | toddler
 const T: Record<Lang, Record<string, string>> = {
   tr: { go: "Başla", skip: "başka →", hint: "söyle", mic: "mikrofon izni gerekli", end: "bitti" },
   ru: { go: "Начали", skip: "другое →", hint: "скажи", mic: "нужен доступ к микрофону", end: "конец" },
@@ -163,7 +164,8 @@ async function start(): Promise<void> {
   $("go").hidden = true; $("skip").hidden = false;
 
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://")
-    + location.host + "/ws?lang=" + lang);
+    + location.host + "/ws?lang=" + lang
+    + (qmode ? "&mode=" + qmode : ""));
   ws.binaryType = "arraybuffer";
 
   ws.onmessage = (ev: MessageEvent) => {

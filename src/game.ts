@@ -22,6 +22,7 @@ import {
   system, unwrap,
 } from "./persona.js";
 import { heardIt, norm, saidExactly } from "./match.js";
+import type { Tolerance } from "./phonetic.js";
 
 const TICK_MS = 200;          // how often we consider asking
 const MIN_QUIET_S = 0.45;     // she must have been quiet this long…
@@ -36,6 +37,10 @@ const EARLY_STABLE_MS = 100;  // an exact-word interim unchanged this long is th
 const INSTANT_TRIES = 2;      // wrong answers up to here get a prepared line, no model wait
 const LOUD_MIN = 700;          // never call anything under this a voice
 const SPEAKING_HOLD_MS = 900; // don't start talking within this of her last sound
+const ATTEMPT_MIN_MS = 250;   // a sound at least this long is an attempt (not a click or a cough)
+const ATTEMPT_MAX_MS = 5000;  // …and not a long stretch of room noise or grown-ups talking
+const ATTEMPT_QUIET_MS = 700; // she has stopped when it has been this quiet…
+const ATTEMPT_WAIT_MS = 1100; // …and the recogniser has had this long (it lags ~500 ms) to say anything
 const TRACE = process.env.STT_TRACE === "1";   // log transcripts + latency (off by default)
 
 export interface GameIO {
@@ -74,6 +79,14 @@ export class Game {
   private nudged = false;
   private judged: [string, number] = ["", 0];
   private earlyTimer: ReturnType<typeof setTimeout> | null = null;
+  // An "attempt" is a stretch of her voice seen in the audio. If the recogniser
+  // reports nothing for it, she still tried — and a child who is ignored stops.
+  private spanStart = 0;        // first loud chunk of the current sound (0 = none)
+  private spanLast = 0;         // most recent loud chunk of it
+  private textAt = 0;           // when the recogniser last said anything
+  private baby: boolean;        // every attempt is a win
+  private tolerance: Tolerance;
+  private modelWord = false;    // the current "win" was an attempt: say the word for her
   private answerAt = 0;         // when the current answer was accepted (latency trace)
   private answerVia = "final";
   private ticker: ReturnType<typeof setInterval> | null = null;
@@ -85,10 +98,12 @@ export class Game {
     private phrases: Record<"ask" | "yes" | "again", string[]>,
     private voice: string,
     private io: GameIO,
-    opts: { noLlm?: boolean; startScore?: number } = {},
+    opts: { noLlm?: boolean; startScore?: number; ageBand?: "baby" | "toddler" } = {},
   ) {
     this.brain = opts.noLlm ? null : new Brain();
     this.score = opts.startScore ?? 0;
+    this.baby = opts.ageBand === "baby";
+    this.tolerance = this.baby ? "high" : "normal";
   }
 
   async start(): Promise<void> {
@@ -134,7 +149,13 @@ export class Game {
     // tracked slowly (it rises only a little per chunk, falls at once), and
     // "loud" means clearly above it.
     this.floor = chunkPeak < this.floor ? chunkPeak : this.floor + (chunkPeak - this.floor) * 0.002;
-    if (chunkPeak > Math.max(LOUD_MIN, this.floor * 4)) this.lastLoudAt = Date.now();
+    const loud = chunkPeak > Math.max(LOUD_MIN, this.floor * 4);
+    if (loud) this.lastLoudAt = Date.now();
+    if (this.deaf()) this.spanStart = 0;            // our own voice is not an attempt
+    else if (loud) {
+      this.spanLast = Date.now();
+      if (!this.spanStart) this.spanStart = this.spanLast;
+    }
     if (!TRACE) return;
     this.micBytes += pcm.length;
     if (chunkPeak > this.micPeak) this.micPeak = chunkPeak;
@@ -277,7 +298,7 @@ export class Game {
   private onPartial(text: string): void {
     if (this.deaf() || !text.trim()) return;  // trap 2: never hear ourselves
     this.talking = true;
-    this.lastVoice = Date.now();
+    this.lastVoice = this.textAt = Date.now();
     const t = text.trim();
     if (t !== this.interim) {
       this.interim = t;
@@ -317,12 +338,18 @@ export class Game {
     if (this.answerVia !== "early") this.answerVia = "final";
     this.interim = ""; this.nudged = false;
     this.heard = text.trim();
-    this.verdict = this.card
+    const matched = this.card
       ? heardIt(this.heard, this.card.word, this.card.also ?? [],
-                this.deck.map((w) => w.word))
+                this.deck.map((w) => w.word), this.tolerance)
       : null;
+    // A baby's every attempt is a win — a wrong guess, a gurgle, a different
+    // animal's name. The code still knows whether she said the word, so the
+    // reply can SAY it for her (modelWord) instead of pretending.
+    this.modelWord = this.baby && this.card !== null && !matched;
+    this.verdict = this.modelWord ? true : matched;
     this.talking = false;
-    this.lastVoice = this.answerAt = Date.now();
+    this.lastVoice = this.textAt = this.answerAt = Date.now();
+    this.spanStart = 0;
     this.tries += 1;
     if (TRACE) this.io.log(`[stt] final "${this.heard}" → ${this.verdict} (${this.answerVia}, ${this.sinceLoud()})`);
     this.io.sendJson({ type: "said", text: this.heard, ok: this.verdict });
@@ -362,6 +389,18 @@ export class Game {
       if (stuck > FLUSH_NUDGE_S && !this.nudged) {
         this.nudged = true;
         this.ears.finalize();
+      }
+    }
+
+    if (this.spanStart && now - this.spanLast > ATTEMPT_WAIT_MS) {
+      const start = this.spanStart, dur = this.spanLast - start;
+      this.spanStart = 0;
+      const unheard = this.textAt < start && !this.heard;
+      if (unheard && dur >= ATTEMPT_MIN_MS && dur <= ATTEMPT_MAX_MS && this.card) {
+        if (TRACE) this.io.log(`[stt] unheard: ${dur} ms of sound, nothing recognised`);
+        this.thinking = true;
+        void this.onUnheard().finally(() => { this.thinking = false; });
+        return;
       }
     }
 
@@ -417,6 +456,7 @@ export class Game {
         { kind: "sound", val: "confetti" },   // the chime, the star and the on-screen
         { kind: "star", val: "" },             // confetti are ONE moment: they fire together,
         { kind: "say", val: this.chatter.line("yes", word) },   // …and only then the words
+        ...(this.modelWord ? [{ kind: "say" as const, val: word + "!" }] : []),
         { kind: "card", val: next },
         { kind: "say", val: this.chatter.line("ask", next) },
       ];
@@ -428,6 +468,34 @@ export class Game {
     } finally {
       this.thinking = false;
     }
+  }
+
+  /** She made a sound the recogniser could not turn into any word. The one
+   *  wrong reply is silence. A baby is cheered and told the word; a toddler
+   *  is encouraged at once, and on the third try is simply told it. */
+  private async onUnheard(): Promise<void> {
+    const word = this.card!.word;
+    this.tries += 1;
+    this.answerAt = Date.now();
+    this.answerVia = "unheard";
+    if (this.baby) {
+      this.modelWord = true;
+      this.verdict = true;
+      this.io.sendJson({ type: "said", text: "…", ok: true });
+      await this.celebrate();
+      return;
+    }
+    this.io.sendJson({ type: "said", text: "…", ok: null });
+    if (this.tries < 3) {
+      await this.perform([{ kind: "say", val: this.chatter.line("again", word) }]);
+      return;
+    }
+    const next = this.unseen();
+    await this.perform([
+      { kind: "say", val: word + "!" },
+      { kind: "card", val: next },
+      { kind: "say", val: this.chatter.line("ask", next) },
+    ]);
   }
 
   /** The model is slow, down, or switched off. The game does not wait: a

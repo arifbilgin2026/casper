@@ -16,6 +16,8 @@ export interface User {
   pw: string;                   // scrypt: salthex:hashhex
   childName: string;
   lang: "tr" | "ru" | "en";
+  /** How forgiving the game is: babies are rewarded for every attempt. */
+  ageBand?: "baby" | "toddler";
   stars: number;
   mastered: string[];           // words answered correctly at least once
   createdAt: string;

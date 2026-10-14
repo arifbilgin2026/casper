@@ -55,10 +55,17 @@ function form(req: IncomingMessage): Promise<Record<string, string>> {
   });
 }
 
-function page(res: ServerResponse, file: string): void {
+const escapeHtml = (t: string) =>
+  t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+/** Send a page. `error` (already a plain-text message) is escaped into the
+ *  <!--ERROR--> slot, so the form pages need no script to show a failure. */
+function page(res: ServerResponse, file: string, error = ""): void {
+  const html = readFileSync(path.join(HERE, "..", "web", file), "utf8")
+    .replace("<!--ERROR-->", escapeHtml(error));
   res.writeHead(200, { "content-type": "text/html; charset=utf-8",
                        "cache-control": "no-store" });
-  res.end(readFileSync(path.join(HERE, "..", "web", file)));
+  res.end(html);
 }
 
 function redirect(res: ServerResponse, to: string, cookie?: string): void {
@@ -68,8 +75,8 @@ function redirect(res: ServerResponse, to: string, cookie?: string): void {
   res.end();
 }
 
-function oops(res: ServerResponse, msg: string): void {
-  redirect(res, "/?error=" + encodeURIComponent(msg));
+function oops(res: ServerResponse, msg: string, to = "/"): void {
+  redirect(res, `${to}?error=${encodeURIComponent(msg)}`);
 }
 
 async function me(req: IncomingMessage): Promise<User | null> {
@@ -83,8 +90,12 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/health") { res.writeHead(200); res.end("ok\n"); return; }
 
     // The two pages. A session sees the game; a stranger sees the gate.
+    const flash = (url.searchParams.get("error") ?? "").slice(0, 200);
     if (url.pathname === "/" && req.method === "GET") {
-      return await me(req) ? redirect(res, "/game") : page(res, "login.html");
+      return await me(req) ? redirect(res, "/game") : page(res, "login.html", flash);
+    }
+    if (url.pathname === "/signup" && req.method === "GET") {
+      return await me(req) ? redirect(res, "/game") : page(res, "signup.html", flash);
     }
     if (url.pathname === "/game" && req.method === "GET") {
       return await me(req) ? page(res, "game.html") : redirect(res, "/");
@@ -101,14 +112,17 @@ const server = createServer(async (req, res) => {
       const b = await form(req);
       const email = (b.email ?? "").trim().toLowerCase();
       const lang = LANGS.includes(b.lang as Lang) ? (b.lang as Lang) : "tr";
-      if (!/^\S+@\S+\.\S+$/.test(email)) return oops(res, "that email looks off");
-      if ((b.password ?? "").length < 6) return oops(res, "password needs 6 characters");
+      const ageBand = b.ageBand === "baby" ? "baby" : "toddler";
+      const back = (m: string) => oops(res, m, "/signup");
+      if (!/^\S+@\S+\.\S+$/.test(email)) return back("That email address doesn't look right.");
+      if ((b.password ?? "").length < 6) return back("Choose a password of at least 6 characters.");
+      if (b.password !== b.confirm) return back("The two passwords don't match.");
       const user: User = {
         email, pw: hashPassword(b.password!),
         childName: (b.childName ?? "").trim() || "kiddo",
-        lang, stars: 0, mastered: [], createdAt: new Date().toISOString(),
+        lang, ageBand, stars: 0, mastered: [], createdAt: new Date().toISOString(),
       };
-      if (!await store.create(user)) return oops(res, "that account already exists — sign in above");
+      if (!await store.create(user)) return back("An account with that email already exists — sign in instead.");
       return redirect(res, "/game", sessionCookie(makeSession(email)));
     }
 
@@ -117,7 +131,7 @@ const server = createServer(async (req, res) => {
       const email = (b.email ?? "").trim().toLowerCase();
       const user = await store.get(email);
       if (!user || !checkPassword(b.password ?? "", user.pw)) {
-        return oops(res, "wrong email or password");
+        return oops(res, "Wrong email or password.");
       }
       return redirect(res, "/game", sessionCookie(makeSession(email)));
     }
@@ -168,7 +182,13 @@ async function session(ws: WebSocket, req: IncomingMessage, user: User): Promise
     sendPcm: (b) => { if (ws.readyState === WebSocket.OPEN) ws.send(b); },
     onStar: (word) => { void store.addStar(user.email, word); },
     log: (line) => console.log(`[${user.email}] ${line}`),
-  }, { noLlm: NO_LLM, startScore: user.stars });
+  }, {
+    noLlm: NO_LLM, startScore: user.stars,
+    // The family's setting, or ?mode=baby|toddler on the game URL to override it.
+    ageBand: url.searchParams.get("mode") === "baby" ? "baby"
+      : url.searchParams.get("mode") === "toddler" ? "toddler"
+      : user.ageBand ?? "toddler",
+  });
 
   try {
     await game.start();

@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- Creating a family account: a regular HTML form, no script. The server
+     checks that the two passwords match and answers a mistake with a redirect
+     back here carrying the message (rendered into the red box below). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>söyle · create account</title>
+<style>
+  :root{ --bg:#fff8ec; --card:#fff; --ink:#2b2118; --dim:#9a8b78;
+         --no:#c0662a; color-scheme:light }
+  @media (prefers-color-scheme:dark){ :root{
+         --bg:#1a1511; --card:#241d17; --ink:#f6efe4; --dim:#8c7f6e;
+         --no:#f0a85c; color-scheme:dark } }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;margin:0;
+       display:grid;place-items:center;padding:24px 16px;
+       font:500 16px/1.45 -apple-system,system-ui,sans-serif}
+  main{width:min(92vw,380px);display:flex;flex-direction:column;gap:18px}
+  .brand{text-align:center}
+  .brand h1{margin:0;font-size:36px;letter-spacing:-.5px}
+  .brand p{margin:4px 0 0;color:var(--dim);font-size:15px}
+  form{background:var(--card);border-radius:24px;padding:28px;display:flex;
+       flex-direction:column;gap:12px;
+       box-shadow:0 18px 50px -18px rgba(90,60,20,.4)}
+  h2{margin:0 0 4px;font-size:20px}
+  label{display:flex;flex-direction:column;gap:5px;font-size:14px;
+        font-weight:600;color:var(--dim)}
+  label small{font-weight:500}
+  input,select{font:inherit;font-weight:500;padding:12px 14px;border-radius:12px;
+        border:1.5px solid var(--dim);background:var(--bg);color:var(--ink);
+        width:100%}
+  input:focus,select:focus{outline:2px solid var(--ink);outline-offset:1px}
+  button{font:inherit;font-weight:700;font-size:17px;padding:13px;margin-top:4px;
+         border-radius:999px;border:0;background:var(--ink);color:var(--bg);
+         cursor:pointer}
+  button:active{transform:scale(.98)}
+  .err{background:rgba(228,144,63,.14);color:var(--no);border-radius:12px;
+       padding:10px 14px;font-size:14px;font-weight:600}
+  .err:empty{display:none}
+  .alt{text-align:center;color:var(--dim);font-size:15px}
+  .alt a{color:var(--ink);font-weight:700}
+</style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <h1>söyle 🗣️</h1>
+      <p>Türkçe · по-русски · English</p>
+    </div>
+
+    <form method="post" action="/signup">
+      <h2>Create an account</h2>
+      <div class="err"><!--ERROR--></div>
+      <label>Email
+        <input name="email" type="email" autocomplete="username" required autofocus>
+      </label>
+      <label>Password
+        <input name="password" type="password" autocomplete="new-password"
+               minlength="6" required>
+      </label>
+      <label>Confirm password
+        <input name="confirm" type="password" autocomplete="new-password"
+               minlength="6" required>
+      </label>
+      <label>Child's first name
+        <input name="childName" type="text" autocomplete="off">
+      </label>
+      <label>Language
+        <select name="lang">
+          <option value="tr">Türkçe</option>
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label>How old is your child?
+        <select name="ageBand">
+          <option value="toddler">2–4 years — says real words</option>
+          <option value="baby">Under 2 — babbles; reward every try</option>
+        </select>
+        <small>Babies get a cheer for every attempt, whatever the sound.</small>
+      </label>
+      <button>Create account</button>
+    </form>
+
+    <p class="alt">Already have an account? <a href="/">Sign in</a></p>
+  </main>
+</body>
+</html>
